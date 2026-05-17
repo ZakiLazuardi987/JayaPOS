@@ -1,0 +1,283 @@
+/* pos-favorit.css */
+
+/* --- CONTAINER SLIDER MURNI --- */
+.carousel-container {
+    display: block;
+    width: 100%;
+    height: calc(100vh - 180px);
+    padding: 10px;
+    position: relative;
+    overflow: hidden;
+}
+.grid-page {
+    display: none;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 12px;
+    width: 100%;
+    height: 100%;
+    animation: fadeInSlide 0.25s ease-out;
+}
+.grid-page.active {
+    display: grid;
+}
+@keyframes fadeInSlide {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* --- DOTS PAGINATION --- */
+.carousel-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+    height: 20px;
+}
+.carousel-dots .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #d1d5db;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+    padding: 0;
+}
+.carousel-dots .dot.active {
+    background: var(--primary);
+}
+#tab-favorit,
+#tab-edit-favorit {
+    padding: 10px;
+    height: 100%;
+}
+
+/* --- KOTAK PRODUK --- */
+.product-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    height: 100%;
+    user-select: none;
+}
+.product-card img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    background: #f1f5f9;
+}
+.product-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    line-height: 1.2;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-height: 32px;
+}
+.empty-card {
+    background: #cbd5e1;
+    box-shadow: none;
+    cursor: default;
+}
+
+/* --- MODE EDIT --- */
+.empty-slot-btn {
+    background: #e2e8f0;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    color: #94a3b8;
+    cursor: pointer;
+    height: 100%;
+    transition: 0.2s;
+}
+.empty-slot-btn:hover {
+    background: #cbd5e1;
+    color: #64748b;
+}
+.btn-remove {
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    background: #ef4444;
+    color: #fff;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    z-index: 10;
+}
+#right-panel-edit {
+    display: none;
+    flex-direction: column;
+}
+.edit-instructions {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 32px;
+    font-size: 1.2rem;
+    color: #777a7b;
+    background: #f9fafb;
+}
+.btn-selesai-edit {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 20px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin: 16px;
+    border-radius: 8px;
+}
+
+/* --- MODAL TAMBAH FAVORIT --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+.modal-content {
+    background: #fff;
+    width: 90%;
+    max-width: 600px;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 600px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+}
+.btn-batal {
+    background: transparent;
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    font-weight: 600;
+    padding: 8px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+.btn-batal:hover {
+    background: var(--primary-100);
+}
+.modal-header h3 {
+    font-size: 1.15rem;
+    color: #111;
+    margin: 0;
+    font-weight: 600;
+    text-align: center;
+    flex: 1;
+}
+.modal-search-container {
+    padding: 0 20px 12px;
+    border-bottom: 2px solid #e5e7eb;
+}
+.search-input-wrapper {
+    position: relative;
+    width: 100%;
+}
+.search-input-wrapper input {
+    width: 100%;
+    padding: 12px 16px;
+    padding-right: 40px;
+    border: 1px solid var(--primary-dark);
+    border-radius: 4px;
+    font-size: 15px;
+    outline: none;
+    color: #333;
+}
+.search-input-wrapper input::placeholder {
+    color: #9ca3af;
+}
+.search-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    color: #6b7280;
+}
+.modal-body.list-view {
+    padding: 0;
+    overflow-y: auto;
+    flex: 1;
+    background: #fff;
+}
+.product-list-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid #f3f4f6;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.product-list-item:hover {
+    background: #f9fafb;
+}
+.product-list-item img {
+    width: 45px;
+    height: 45px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 16px;
+    background: #eee;
+    border: 1px solid #e5e7eb;
+}
+.product-list-item .product-name {
+    font-size: 15px;
+    color: #333;
+    font-weight: 500;
+}
+.empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    color: #9ca3af;
+}

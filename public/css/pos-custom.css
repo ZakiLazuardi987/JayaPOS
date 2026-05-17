@@ -1,0 +1,139 @@
+/* pos-custom.css */
+
+/* ============================================================
+   WRAPPER TAB CUSTOM
+   ============================================================ */
+   #tab-custom {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0;
+    background-color: #ffffff;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   DISPLAY ANGKA — rata kanan, border bawah
+   ============================================================ */
+.calc-display {
+    width: 100%;
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--primary, #b91c1c);
+    text-align: right;
+    padding: 20px 24px 16px 24px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #ffffff;
+    flex-shrink: 0;
+    letter-spacing: -0.5px;
+}
+
+/* ============================================================
+   GRID KALKULATOR — memenuhi sisa tinggi panel
+   ============================================================ */
+.calc-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    flex: 1;
+    border-top: 1px solid #e2e8f0;
+    border-left: 1px solid #e2e8f0;
+    overflow: hidden;
+}
+
+/* ============================================================
+   TOMBOL KALKULATOR — flat, kotak seperti desain
+   ============================================================ */
+.calc-btn {
+    background: #ffffff;
+    border: none;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    border-radius: 0;
+    font-size: 28px;
+    font-weight: 500;
+    color: #1e293b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s ease;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+.calc-btn:hover  { background: #f8fafc; }
+.calc-btn:active { background: #f1f5f9; }
+
+/* Tombol + : span 2 baris, merah solid */
+.calc-btn.span-row {
+    grid-row: span 2;
+    background: var(--primary, #b91c1c);
+    color: #ffffff;
+    font-size: 32px;
+    font-weight: 700;
+}
+.calc-btn.span-row:hover  { background: #991b1b; }
+.calc-btn.span-row:active { background: #7f1d1d; }
+
+/* Tombol C : span 2 kolom, teks merah */
+.calc-btn.span-2 {
+    grid-column: span 2;
+    color: var(--primary, #b91c1c);
+    font-size: 22px;
+    font-weight: 600;
+}
+
+/* Tombol Del */
+.calc-btn.btn-del {
+    color: #475569;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+
+
+/* ============================================================
+   Custom Amount row di right panel
+   ============================================================ */
+.custom-amount-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 16px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 15px;
+    box-sizing: border-box;
+}
+
+.custom-amount-item .custom-amount-label {
+    color: #94a3b8;
+    font-weight: 400;
+}
+
+.custom-amount-item .custom-amount-value {
+    color: #1e293b;
+    font-weight: 500;
+}
+
+/* ============================================================
+   Bill content: center saat kosong, flex-start saat ada item
+   ============================================================ */
+
+/* Default: center untuk placeholder "Tidak Ada Produk" */
+.bill-content {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Saat ada custom amount item → switch ke atas */
+.bill-content.has-items {
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+}
