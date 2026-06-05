@@ -77,7 +77,7 @@ body {
     align-items: center;
     justify-content: center;
     font-weight: 500;
-    font-size: 0.75rem;
+    font-size: 1rem;
     color: var(--primary-dark);
     cursor: pointer;
     gap: 4px;
@@ -204,7 +204,7 @@ body {
     background: none;
     border: none;
     color: var(--primary);
-    font-size: 1.2rem;
+    font-size: 2rem;
     font-weight: bold;
     cursor: pointer;
     line-height: 1;
@@ -304,13 +304,14 @@ body {
     border-right: 1px solid var(--white);
     color: var(--white);
     font-weight: 500;
-    font-size: 0.75rem;
+    font-size: 1rem;
     cursor: pointer;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 3px;
+    transition: background 0.2s;
 }
 .btn-bayar {
     flex: 8;
@@ -323,10 +324,12 @@ body {
     cursor: pointer;
     transition: background 0.2s;
 }
-.btn-bayar.has-items {
+.btn-bayar.has-items,
+.btn-pisah.has-items {
     background: var(--primary);
 }
-.btn-bayar.has-items:hover {
+.btn-bayar.has-items:hover,
+.btn-pisah.has-items:hover {
     background: var(--primary-dark);
 }
 
@@ -358,7 +361,8 @@ body {
 }
 .nav-btn svg { margin-bottom: 4px; }
 .btn-hamburger {
-    flex: 0.5;
+    flex: 0 0 250px;
+    width: 250px;
     border-right: 1px solid rgba(255, 255, 255, 0.2);
 }
 .sidebar-overlay {
@@ -472,8 +476,8 @@ body {
 /* Modal Detail Produk */
 .detail-modal {
     height: 85vh !important;
-    max-width: 520px !important;
-    border-radius: 12px !important;
+    max-width: 720px !important;
+    border-radius: 8px !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
@@ -1250,3 +1254,373 @@ body {
     background: var(--primary);
     color: white;
 }
+
+/* Product Detail Modal: Catatan & Hint */
+.order-type-hint-text {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    margin-top: 16px;
+    font-style: italic;
+    line-height: 1.4;
+}
+
+.detail-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 16px 20px;
+}
+
+.notes-section {
+    padding: 0 20px 24px 20px;
+}
+
+.notes-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.notes-textarea {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 0.95rem;
+    color: var(--text-dark);
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.notes-textarea:focus {
+    border-color: var(--primary);
+}
+
+/* =============================================
+   CHOOSE TABLE & FLOOR PLAN OVERLAY STYLE
+   ============================================= */
+.area-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+.area-tab-btn.active {
+    background: var(--primary-dark) !important;
+}
+.table-available:hover {
+    border-color: #fca5a5 !important;
+    background: #fff5f5 !important;
+}
+.table-available.active-table-card {
+    border-color: var(--primary) !important;
+    background: #fee2e2 !important;
+    box-shadow: 0 4px 12px rgba(196, 54, 38, 0.15) !important;
+}
+.table-available.active-table-card span {
+    color: var(--primary) !important;
+}
+
+/* Modal Bill Baru waiter items */
+.waiter-item.active-waiter {
+    background: #fee2e2 !important;
+}
+.waiter-item.active-waiter .staff-name {
+    color: var(--primary) !important;
+    font-weight: 700 !important;
+}
+.pax-input-wrapper:focus-within {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 1px var(--primary);
+}
+
+/* =============================================
+   DAFTAR BILL MODAL
+   ============================================= */
+
+/* Tabs — bordered pill container matching the design */
+.daftar-bill-tabs {
+    display: flex;
+    margin: 16px 32px;
+    border: 1.5px solid var(--primary);
+    border-radius: 8px;
+    overflow: hidden;
+    gap: 0;
+}
+.daftar-bill-tab {
+    flex: 1;oke sip
+    background: none;
+    border: none;
+    border-right: 1.5px solid var(--primary);
+    padding: 13px 0;
+    font-size: 0.97rem;
+    font-weight: 600;
+    color: var(--primary);
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+}
+.daftar-bill-tab:last-child {
+    border-right: none;
+}
+.daftar-bill-tab.active {
+    background: var(--primary);
+    color: #fff;
+}
+.daftar-bill-tab:not(.active):hover {
+    background: #fee2e2;
+}
+
+/* Search */
+.daftar-bill-search-wrap {
+    position: relative;
+    padding: 0 32px 12px;
+}
+.daftar-bill-search {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1.5px solid #d1d5db;
+    border-radius: 8px;
+    padding: 13px 48px 13px 18px;
+    font-size: 1rem;
+    font-family: inherit;
+    color: #374151;
+    outline: none;
+    transition: border-color 0.2s;
+    background: #fff;
+}
+.daftar-bill-search:focus {
+    border-color: var(--primary);
+}
+.daftar-bill-search-icon {
+    position: absolute;
+    right: 50px;
+    top: 50%;
+    transform: translateY(-60%);
+    pointer-events: none;
+}
+
+/* Table header */
+.daftar-bill-table-header {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1.2fr 0.9fr 0.6fr;
+    padding: 10px 32px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #111827;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* Table rows */
+.daftar-bill-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.daftar-bill-row {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1.2fr 0.9fr 0.6fr;
+    padding: 20px 32px;
+    border-bottom: 1px solid #e5e7eb;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.daftar-bill-row:hover {
+    background: #fef2f2;
+}
+.daftar-bill-row td {
+    font-size: 1rem;
+    color: #374151;
+    display: flex;
+    align-items: center;
+}
+.daftar-bill-sync-icon {
+    color: #22c55e;
+    display: flex;
+    align-items: center;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+
+/* =============================================
+   PISAH BILL DESIGN (SPLIT BILL)
+   ============================================= */
+.pisah-bill-box {
+    border: 1.5px solid var(--primary);
+    border-radius: 6px;
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff;
+    margin-bottom: 8px;
+}
+.pisah-bill-box-label {
+    font-weight: 700;
+    color: #1f2937;
+    font-size: 1.05rem;
+}
+.pisah-bill-box-val {
+    font-weight: 700;
+    color: #1f2937;
+    font-size: 1.15rem;
+}
+
+.pisah-bill-section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #374151;
+    margin-top: 12px;
+    margin-bottom: 12px;
+}
+
+.pisah-bill-group-header {
+    text-align: center;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #4b5563;
+    padding: 10px 0;
+    background: #f9fafb;
+    border-top: 1px solid #f3f4f6;
+    border-bottom: 1px solid #f3f4f6;
+    letter-spacing: 0.05em;
+    margin: 12px 0;
+}
+
+.pisah-bill-item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 8px;
+    border-bottom: 1.5px solid #f3f4f6;
+}
+.pisah-bill-item-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.pisah-bill-item-img {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #f3f4f6;
+}
+.pisah-bill-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.pisah-bill-item-name {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #1f2937;
+}
+.pisah-bill-item-price {
+    font-size: 0.95rem;
+    color: #9ca3af;
+    font-weight: 500;
+}
+
+.pisah-bill-item-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* Qty Selector Pill */
+.pisah-bill-qty-pill {
+    display: flex;
+    align-items: center;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #f9fafb;
+}
+.pisah-bill-qty-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: #f3f4f6;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #9ca3af;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+.pisah-bill-qty-btn:hover {
+    background: #e5e7eb;
+}
+.pisah-bill-qty-btn.active {
+    background: var(--primary);
+    color: #fff;
+}
+.pisah-bill-qty-val {
+    width: 44px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #374151;
+}
+
+/* Checkbox Circle */
+.pisah-bill-checkbox-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid #d1d5db;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: #fff;
+    transition: all 0.2s;
+}
+.pisah-bill-checkbox-circle.selected {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #fff;
+}
+.pisah-bill-checkbox-circle svg {
+    display: none;
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 3;
+}
+.pisah-bill-checkbox-circle.selected svg {
+    display: block;
+}
+
+/* Summary item */
+.pisah-bill-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 8px;
+    font-size: 0.95rem;
+}
+.pisah-bill-summary-label {
+    color: #1f2937;
+    font-weight: 600;
+}
+.pisah-bill-summary-sublabel {
+    color: #9ca3af;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-top: 2px;
+}
+.pisah-bill-summary-val {
+    color: #9ca3af;
+    font-weight: 500;
+}
+

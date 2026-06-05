@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\LoginController;
-use App\Http\Controllers\POSController; // Tambahkan controller baru untuk POS
+use App\Http\Controllers\POSController;
 
 // ==========================================
 // LANDING PAGE (Bisa diakses siapa saja)
@@ -53,6 +53,17 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/favorite/add', [POSController::class, 'addFavorite'])->name('addFavorite');
         Route::post('/favorite/remove', [POSController::class, 'removeFavorite'])->name('removeFavorite');
         
+        // AJAX: Simpan Bill (Order Pending + Table Occupied)
+        Route::post('/orders/save-bill', [POSController::class, 'saveBill'])->name('saveBill');
+
+        // AJAX: Daftar Bill (Pending Orders)
+        Route::get('/orders/pending-bills', [POSController::class, 'getPendingBills'])->name('pendingBills');
+
+        // AJAX: Detail Order (follow-up bill)
+        Route::get('/orders/{id}/detail', [POSController::class, 'getOrderDetail'])->name('orderDetail');
+
+        // AJAX: Update Meja Order Pending
+        Route::patch('/orders/{id}/update-table', [POSController::class, 'updateOrderTable'])->name('updateOrderTable');
     });
 });
 

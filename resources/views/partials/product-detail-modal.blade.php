@@ -88,6 +88,18 @@
                         Maxim Food
                     </label>
                 </div>
+                
+                <div class="order-type-hint-text">
+                    Anda tidak dapat memilih tipe penjualan tertentu, karena tipe penjualan tersebut tidak memiliki harga. Silakan melihat backoffice kembali untuk mendapatkan detil lebih lanjut.
+                </div>
+            </div>
+
+            <hr class="detail-divider">
+
+            {{-- CATATAN --}}
+            <div class="notes-section">
+                <div class="notes-label">CATATAN</div>
+                <textarea id="inputCatatan" class="notes-textarea" placeholder="Deskripsi" rows="3"></textarea>
             </div>
 
         </div>{{-- /detail-body --}}

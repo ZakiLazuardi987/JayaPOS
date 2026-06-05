@@ -294,7 +294,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const billSummary  = document.getElementById('billSummary');
         const totalBayar   = document.getElementById('totalBayar');
         const btnBayar     = document.getElementById('totalBayar');
+        const activeTableRow = document.getElementById('activeTableRow');
+        const activeTableName = document.getElementById('activeTableName');
         if (!container) return;
+
+        // Dynamic enable/disable of Pisah Bill button
+        const btnPisahBill = document.getElementById('btnPisahBill');
+        if (btnPisahBill) {
+            const totalQty = cart.reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
+            if (totalQty > 1) {
+                btnPisahBill.removeAttribute('disabled');
+                btnPisahBill.style.opacity = '1';
+                btnPisahBill.style.pointerEvents = 'auto';
+                btnPisahBill.classList.add('has-items');
+            } else {
+                btnPisahBill.setAttribute('disabled', 'true');
+                btnPisahBill.style.opacity = '1';
+                btnPisahBill.style.pointerEvents = 'none';
+                btnPisahBill.classList.remove('has-items');
+            }
+        }
 
         if (cart.length === 0) {
             container.innerHTML = `
@@ -306,7 +325,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
             if (billSummary) billSummary.style.display = 'none';
             if (totalBayar) { totalBayar.innerText = 'Bayar Rp 0'; totalBayar.classList.remove('has-items'); }
+            
+            // Hapus table terpilih jika keranjang kosong
+            localStorage.removeItem('active_table');
+            if (activeTableRow) activeTableRow.style.display = 'none';
             return;
+        }
+
+        // Tampilkan info meja jika aktif
+        const activeTable = JSON.parse(localStorage.getItem('active_table'));
+        if (activeTable && activeTableRow && activeTableName) {
+            activeTableName.innerText = activeTable.name;
+            activeTableRow.style.display = 'flex';
+        } else if (activeTableRow) {
+            activeTableRow.style.display = 'none';
         }
 
         container.innerHTML = '';
@@ -796,6 +828,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (idx !== -1) {
                     cart[idx] = {
                         ...cart[idx],           // pertahankan id & product_id
+                        img_url:     currentProduct.img_url,
                         modifiers:   selectedMods,
                         discounts:   selectedDiscounts,
                         order_type:  orderType,
@@ -814,6 +847,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     id:          Date.now(),
                     product_id:  currentProduct.product_id,
                     name:        currentProduct.name,
+                    img_url:     currentProduct.img_url,
                     base_price:  currentProduct.price,
                     modifiers:   selectedMods,
                     discounts:   selectedDiscounts,
@@ -884,12 +918,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function openPaymentModal() {
         if (modalStaff) modalStaff.style.display = 'none';
         if (modalPayment) {
-            if (paymentTotalDisplay) paymentTotalDisplay.innerText = `Rp ${currentGrandTotal.toLocaleString('id-ID')}`;
+            const activeTotal = window.splitBillActive ? window.splitBillSummaryData.grandTotal : currentGrandTotal;
+            if (paymentTotalDisplay) paymentTotalDisplay.innerText = `Rp ${activeTotal.toLocaleString('id-ID')}`;
             if (paymentServerName) paymentServerName.innerText = `| ${selectedStaffName}`;
             
             const btnUangPas = document.getElementById('btnUangPas');
-            let next1k = Math.ceil(currentGrandTotal / 1000) * 1000;
-            if (next1k === 0) next1k = currentGrandTotal;
+            let next1k = Math.ceil(activeTotal / 1000) * 1000;
+            if (next1k === 0) next1k = activeTotal;
             if (btnUangPas) {
                 btnUangPas.innerText = `Rp ${next1k.toLocaleString('id-ID')}`;
                 btnUangPas.dataset.val = next1k;
@@ -897,14 +932,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const inputTunai = document.getElementById('inputTunaiManual');
             if (inputTunai) {
-                inputTunai.placeholder = `Rp ${currentGrandTotal.toLocaleString('id-ID')}`;
+                inputTunai.placeholder = `Rp ${activeTotal.toLocaleString('id-ID')}`;
                 inputTunai.value = ''; // Reset
             }
 
             const btnUang50k = document.getElementById('btnUang50k');
             if (btnUang50k) {
-                let next50k = Math.ceil(currentGrandTotal / 50000) * 50000;
-                if (next50k === next1k && currentGrandTotal > 0) next50k += 50000;
+                let next50k = Math.ceil(activeTotal / 50000) * 50000;
+                if (next50k === next1k && activeTotal > 0) next50k += 50000;
                 if (next50k === 0) next50k = 50000;
                 btnUang50k.innerText = `Rp ${next50k.toLocaleString('id-ID')}`;
                 btnUang50k.dataset.val = next50k;
@@ -1000,13 +1035,1013 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.addEventListener('click', (e) => {
-        if (e.target === modalLoyalty) modalLoyalty.style.display = 'none';
+        if (e.target === modalLoyalty) {
+            modalLoyalty.style.display = 'none';
+            window.splitBillActive = false;
+        }
         if (e.target === modalStaff) modalStaff.style.display = 'none';
         if (e.target === modalPayment) modalPayment.style.display = 'none';
     });
 
+    const btnProsesPayment = document.getElementById('btnProsesPayment');
+    const modalTunaiSuccess = document.getElementById('modalTunaiSuccess');
+    const modalQris = document.getElementById('modalQris');
+    const btnBatalQris = document.getElementById('btnBatalQris');
+    const modalBatalQrisConfirm = document.getElementById('modalBatalQrisConfirm');
+    const btnCancelBatalQris = document.getElementById('btnCancelBatalQris');
+    const btnConfirmBatalQris = document.getElementById('btnConfirmBatalQris');
+    const btnTransaksiBaru = document.getElementById('btnTransaksiBaru');
+    let qrisInterval = null;
+
+    if (btnProsesPayment) {
+        btnProsesPayment.addEventListener('click', () => {
+            const activeBtn = document.querySelector('.payment-modal-body .btn-payment-outline.active');
+            const inputTunaiManual = document.getElementById('inputTunaiManual');
+            
+            let tunaiValue = 0;
+            if (inputTunaiManual && inputTunaiManual.value) {
+                tunaiValue = parseInt(inputTunaiManual.value.toString().replace(/\D/g, '')) || 0;
+            }
+
+            let isEwallet = activeBtn && activeBtn.dataset.method === 'ewallet';
+            const activeTotal = window.splitBillActive ? window.splitBillSummaryData.grandTotal : currentGrandTotal;
+
+            if (isEwallet) {
+                modalPayment.style.display = 'none';
+                document.getElementById('qrisTotalHargaDisplay').innerText = `Rp ${activeTotal.toLocaleString('id-ID')}`;
+                modalQris.style.display = 'flex';
+
+                let secondsLeft = 60;
+                const textEl = document.getElementById('qrisCountdownText');
+                const circle = document.getElementById('qrisProgressCircle');
+                if (textEl && circle) {
+                    textEl.innerText = secondsLeft;
+                    circle.style.strokeDashoffset = '0';
+                    clearInterval(qrisInterval);
+                    qrisInterval = setInterval(() => {
+                        secondsLeft--;
+                        if (secondsLeft < 0) {
+                            clearInterval(qrisInterval);
+                            return;
+                        }
+                        textEl.innerText = secondsLeft;
+                        const offset = 226 - (secondsLeft / 60) * 226;
+                        circle.style.strokeDashoffset = offset;
+                    }, 1000);
+                }
+            } else {
+                let bayar = tunaiValue;
+                if (bayar < activeTotal) {
+                    showToast('Nominal pembayaran kurang dari total!', true);
+                    return;
+                }
+                
+                modalPayment.style.display = 'none';
+                document.getElementById('tunaiSuccessBayar').innerText = `Rp ${bayar.toLocaleString('id-ID')}`;
+                const kembalian = bayar - activeTotal;
+                document.getElementById('tunaiSuccessKembalian').innerText = `Rp ${kembalian.toLocaleString('id-ID')}`;
+                modalTunaiSuccess.style.display = 'flex';
+            }
+        });
+    }
+
+    const btnBatalTunai = document.getElementById('btnBatalTunai');
+    
+    if (btnBatalTunai) {
+        btnBatalTunai.addEventListener('click', () => {
+            if(modalBatalQrisConfirm) modalBatalQrisConfirm.style.display = 'flex';
+        });
+    }
+
+    if (btnBatalQris) {
+        btnBatalQris.addEventListener('click', () => {
+            if(modalBatalQrisConfirm) modalBatalQrisConfirm.style.display = 'flex';
+        });
+    }
+
+    if (btnCancelBatalQris) {
+        btnCancelBatalQris.addEventListener('click', () => {
+            if(modalBatalQrisConfirm) modalBatalQrisConfirm.style.display = 'none';
+        });
+    }
+
+    if (btnConfirmBatalQris) {
+        btnConfirmBatalQris.addEventListener('click', () => {
+            clearInterval(qrisInterval);
+            if(modalBatalQrisConfirm) modalBatalQrisConfirm.style.display = 'none';
+            if(modalQris) modalQris.style.display = 'none';
+            if(modalTunaiSuccess) modalTunaiSuccess.style.display = 'none';
+            if(modalPayment) modalPayment.style.display = 'flex';
+        });
+    }
+
+    if (btnTransaksiBaru) {
+        btnTransaksiBaru.addEventListener('click', () => {
+            if(modalTunaiSuccess) modalTunaiSuccess.style.display = 'none';
+            
+            if (window.splitBillActive) {
+                // Deduct selected split quantities from main cart!
+                cart = cart.map(item => {
+                    const splitState = selectedSplitItems[item.id];
+                    if (splitState && splitState.selected) {
+                        item.qty -= splitState.qty;
+                        item.total_price = item.qty * item.unit_price;
+                    }
+                    return item;
+                }).filter(item => item.qty > 0);
+                
+                saveCart();
+                window.splitBillActive = false;
+                
+                if (cart.length === 0) {
+                    localStorage.removeItem('active_table');
+                }
+                window.location.reload();
+            } else {
+                cart = [];
+                saveCart();
+                localStorage.removeItem('active_table');
+                window.location.reload();
+            }
+        });
+    }
+
     // =========================================================
-    // 11. INIT
+    // 10A. PISAH BILL (SPLIT BILL) ENGINE
+    // =========================================================
+    const modalPisahBill = document.getElementById('modalPisahBill');
+    const btnPisahBill = document.getElementById('btnPisahBill');
+    const btnPisahBillTutup = document.getElementById('btnPisahBillTutup');
+    const btnPisahBillPisahkan = document.getElementById('btnPisahBillPisahkan');
+    const pisahBillAmountDisplay = document.getElementById('pisahBillAmountDisplay');
+    const pisahBillProductList = document.getElementById('pisahBillProductList');
+    const pisahBillBreakdown = document.getElementById('pisahBillBreakdown');
+
+    let selectedSplitItems = {};
+
+    if (btnPisahBill && modalPisahBill) {
+        btnPisahBill.addEventListener('click', () => {
+            if (cart.length === 0) {
+                showToast('Keranjang masih kosong', true);
+                return;
+            }
+            openPisahBillModal();
+        });
+    }
+
+    if (btnPisahBillTutup && modalPisahBill) {
+        btnPisahBillTutup.addEventListener('click', () => {
+            modalPisahBill.style.display = 'none';
+            // Bersihkan state split
+            window.splitBillActive = false;
+            window.splitBillSummaryData = null;
+            selectedSplitItems = {};
+            // renderCart() sudah menghitung diskon + pajak + service charge
+            // dan memperbarui tombol "Bayar" dengan total yang benar
+            renderCart();
+        });
+    }
+
+    if (btnPisahBillPisahkan && modalPisahBill && modalLoyalty) {
+        btnPisahBillPisahkan.addEventListener('click', () => {
+            const hasSelection = Object.values(selectedSplitItems).some(s => s.selected && s.qty > 0);
+            if (!hasSelection) {
+                showToast('Pilih minimal satu produk untuk dipisahkan', true);
+                return;
+            }
+
+            window.splitBillActive = true;
+            modalPisahBill.style.display = 'none';
+
+            const titleEl = modalLoyalty.querySelector('.loyalty-modal-title');
+            if (titleEl) titleEl.innerText = 'Pisah Bill';
+            modalLoyalty.style.display = 'flex';
+        });
+    }
+
+    if (btnBatalLoyalty && modalLoyalty) {
+        btnBatalLoyalty.addEventListener('click', () => {
+            modalLoyalty.style.display = 'none';
+            window.splitBillActive = false;
+            window.splitBillSummaryData = null;
+            selectedSplitItems = {};
+            // renderCart() menghitung ulang total termasuk diskon + pajak
+            renderCart();
+        });
+    }
+
+    function openPisahBillModal() {
+        selectedSplitItems = {};
+        cart.forEach(item => {
+            selectedSplitItems[item.id] = {
+                qty: 1,
+                selected: false,
+                maxQty: item.qty
+            };
+        });
+
+        renderPisahBillList();
+        calculateSplitBill();
+        modalPisahBill.style.display = 'flex';
+    }
+
+    function renderPisahBillList() {
+        if (!pisahBillProductList) return;
+        pisahBillProductList.innerHTML = '';
+
+        const typeLabels = {
+            'dine-in': 'Dine In',
+            'takeaway': 'Take Away',
+            'gofood': 'GoFood',
+            'grabfood': 'GrabFood',
+            'shopeefood': 'ShopeeFood'
+        };
+
+        const groups = {};
+        cart.forEach(item => {
+            const type = item.order_type || 'dine-in';
+            if (!groups[type]) groups[type] = [];
+            groups[type].push(item);
+        });
+
+        for (const [type, items] of Object.entries(groups)) {
+            const header = document.createElement('div');
+            header.className = 'pisah-bill-group-header';
+            header.innerText = typeLabels[type] || type.toUpperCase();
+            pisahBillProductList.appendChild(header);
+
+            items.forEach(item => {
+                const splitState = selectedSplitItems[item.id] || { qty: 1, selected: false };
+                let imgSrc = '/images/default.jpg';
+                if (item.img_url) {
+                    imgSrc = item.img_url.startsWith('http') || item.img_url.startsWith('/') ? item.img_url : '/' + item.img_url;
+                }
+
+                const row = document.createElement('div');
+                row.className = 'pisah-bill-item-row';
+                row.innerHTML = `
+                    <div class="pisah-bill-item-left">
+                        <img src="${imgSrc}" class="pisah-bill-item-img" alt="${item.name}">
+                        <div class="pisah-bill-item-info">
+                            <span class="pisah-bill-item-name">${item.name}</span>
+                            <span class="pisah-bill-item-price">Rp ${item.unit_price.toLocaleString('id-ID')}</span>
+                        </div>
+                    </div>
+                    <div class="pisah-bill-item-right">
+                        <div class="pisah-bill-qty-pill">
+                            <button class="pisah-bill-qty-btn minus-btn ${splitState.selected ? 'active' : ''}">-</button>
+                            <span class="pisah-bill-qty-val">${splitState.qty}</span>
+                            <button class="pisah-bill-qty-btn plus-btn ${splitState.selected ? 'active' : ''}">+</button>
+                        </div>
+                        <div class="pisah-bill-checkbox-circle ${splitState.selected ? 'selected' : ''}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+                `;
+
+                const qtyValSpan = row.querySelector('.pisah-bill-qty-val');
+                const minusBtn = row.querySelector('.minus-btn');
+                const plusBtn = row.querySelector('.plus-btn');
+                const checkboxCircle = row.querySelector('.pisah-bill-checkbox-circle');
+
+                const updateRowVisualState = () => {
+                    const activeState = selectedSplitItems[item.id];
+                    if (activeState.selected) {
+                        checkboxCircle.classList.add('selected');
+                        minusBtn.classList.add('active');
+                        plusBtn.classList.add('active');
+                    } else {
+                        checkboxCircle.classList.remove('selected');
+                        minusBtn.classList.remove('active');
+                        plusBtn.classList.remove('active');
+                    }
+                    qtyValSpan.innerText = activeState.qty;
+                    calculateSplitBill();
+                };
+
+                checkboxCircle.addEventListener('click', () => {
+                    selectedSplitItems[item.id].selected = !selectedSplitItems[item.id].selected;
+                    updateRowVisualState();
+                });
+
+                minusBtn.addEventListener('click', () => {
+                    const activeState = selectedSplitItems[item.id];
+                    if (activeState.qty > 1) {
+                        activeState.qty--;
+                    } else if (activeState.qty === 1 && activeState.selected) {
+                        activeState.selected = false;
+                    }
+                    updateRowVisualState();
+                });
+
+                plusBtn.addEventListener('click', () => {
+                    const activeState = selectedSplitItems[item.id];
+                    if (activeState.qty < activeState.maxQty) {
+                        activeState.qty++;
+                        activeState.selected = true;
+                    } else {
+                        showToast(`Jumlah maksimal adalah ${activeState.maxQty}`);
+                    }
+                    updateRowVisualState();
+                });
+
+                pisahBillProductList.appendChild(row);
+            });
+        }
+    }
+
+    function calculateSplitBill() {
+        let splitSubtotal = 0;
+        let splitDiscount = 0;
+        let splitCharge = 0;
+        let activeChargeLabel = 'Biaya Tambahan';
+        
+        cart.forEach(item => {
+            const splitState = selectedSplitItems[item.id];
+            if (splitState && splitState.selected && splitState.qty > 0) {
+                const itemQty = splitState.qty;
+                const itemSubtotal = item.unit_price * itemQty;
+                splitSubtotal += itemSubtotal;
+                
+                let itemTotalDiscount = 0;
+                if (item.discounts && item.discounts.length > 0) {
+                    item.discounts.forEach(d => {
+                        if (d.type === 'percentage') {
+                            itemTotalDiscount += itemSubtotal * (d.value / 100);
+                        } else {
+                            itemTotalDiscount += (parseFloat(d.value) / item.qty) * itemQty;
+                        }
+                    });
+                }
+                splitDiscount += itemTotalDiscount;
+                
+                let itemNet = itemSubtotal - itemTotalDiscount;
+                if (window.POS_CONFIG && window.POS_CONFIG.serviceCharges) {
+                    let chargeConfig = window.POS_CONFIG.serviceCharges.find(c => {
+                        let typeKeyword = item.order_type === 'dine-in' ? 'dine' : item.order_type;
+                        return c.name.toLowerCase().includes(typeKeyword);
+                    });
+
+                    if (chargeConfig) {
+                        let chargeVal = 0;
+                        if (chargeConfig.type === 'percentage') {
+                            chargeVal = itemNet * (parseFloat(chargeConfig.value) / 100);
+                        } else {
+                            chargeVal = (parseFloat(chargeConfig.value) / item.qty) * itemQty;
+                        }
+                        splitCharge += chargeVal;
+                        
+                        let currentLabel = `${chargeConfig.name} (${chargeConfig.type === 'percentage' ? parseFloat(chargeConfig.value) + '%' : 'Rp ' + parseFloat(chargeConfig.value).toLocaleString('id-ID')})`;
+                        if (!activeChargeLabel || activeChargeLabel === 'Biaya Tambahan') activeChargeLabel = currentLabel;
+                        else if (activeChargeLabel !== currentLabel) activeChargeLabel = 'Service Charges';
+                    }
+                }
+            }
+        });
+        
+        const splitAfterDiscount = splitSubtotal - splitDiscount;
+        
+        let splitTax = 0;
+        let taxLabelText = 'Pajak';
+        if (window.POS_CONFIG && window.POS_CONFIG.taxes && window.POS_CONFIG.taxes.length > 0) {
+            let taxConfig = window.POS_CONFIG.taxes[0];
+            if (taxConfig.type === 'percentage') {
+                splitTax = splitAfterDiscount * (parseFloat(taxConfig.value) / 100);
+                taxLabelText = `${taxConfig.name} (${parseFloat(taxConfig.value)}%)`;
+            } else {
+                const mainAfterDiscount = cart.reduce((sum, item) => sum + (item.total_price), 0);
+                splitTax = mainAfterDiscount > 0 ? parseFloat(taxConfig.value) * (splitAfterDiscount / mainAfterDiscount) : 0;
+                taxLabelText = taxConfig.name;
+            }
+        } else {
+            splitTax = splitAfterDiscount * 0.10;
+            taxLabelText = 'PPN Resto (10%)';
+        }
+        
+        const splitGrandTotal = splitAfterDiscount + splitCharge + splitTax;
+        
+        pisahBillAmountDisplay.innerText = `Rp ${Math.round(splitGrandTotal).toLocaleString('id-ID')}`;
+        
+        pisahBillBreakdown.innerHTML = `
+            <div class="pisah-bill-summary-row">
+                <div>
+                    <div class="pisah-bill-summary-label">Diskon</div>
+                    <div class="pisah-bill-summary-sublabel">Diskon VIP</div>
+                </div>
+                <span class="pisah-bill-summary-val" style="color: #c43626;">-Rp ${Math.round(splitDiscount).toLocaleString('id-ID')}</span>
+            </div>
+            <div class="pisah-bill-summary-row">
+                <div>
+                    <div class="pisah-bill-summary-label">Biaya Tambahan</div>
+                    <div class="pisah-bill-summary-sublabel">${activeChargeLabel}</div>
+                </div>
+                <span class="pisah-bill-summary-val">Rp ${Math.round(splitCharge).toLocaleString('id-ID')}</span>
+            </div>
+            <div class="pisah-bill-summary-row">
+                <div>
+                    <div class="pisah-bill-summary-label">Pajak</div>
+                    <div class="pisah-bill-summary-sublabel">${taxLabelText}</div>
+                </div>
+                <span class="pisah-bill-summary-val">Rp ${Math.round(splitTax).toLocaleString('id-ID')}</span>
+            </div>
+        `;
+
+        window.splitBillSummaryData = {
+            subtotal: splitSubtotal,
+            discount: splitDiscount,
+            charge: splitCharge,
+            tax: splitTax,
+            grandTotal: splitGrandTotal,
+            chargeLabel: activeChargeLabel,
+            taxLabel: taxLabelText
+        };
+    }
+
+    // =========================================================
+    // 10B. DENAH MEJA & PILIH MEJA SELECTION
+    // =========================================================
+    const btnSimpanBillTrigger = document.getElementById('btnSimpanBillTrigger');
+    const overlayPilihMeja      = document.getElementById('overlayPilihMeja');
+    const btnPilihMejaBatal     = document.getElementById('btnPilihMejaBatal');
+    const areaTabBtns           = document.querySelectorAll('.area-tab-btn');
+    const tableAvailableCards   = document.querySelectorAll('.table-card.table-available');
+    const btnSimpanSebagaiBill  = document.getElementById('btnSimpanSebagaiBill');
+    const btnMejaLanjutkan       = document.getElementById('btnMejaLanjutkan');
+
+    const modalBillBaru         = document.getElementById('modalBillBaru');
+    const btnBillBaruBatal      = document.getElementById('btnBillBaruBatal');
+    const btnBillBaruKonfirmasi = document.getElementById('btnBillBaruKonfirmasi');
+    const billBaruSubTitle      = document.getElementById('billBaruSubTitle');
+    const inputPax              = document.getElementById('inputPax');
+    const btnPaxMinus           = document.getElementById('btnPaxMinus');
+    const btnPaxPlus            = document.getElementById('btnPaxPlus');
+    const waiterSelectionList   = document.getElementById('waiterSelectionList');
+    const waiterItems           = document.querySelectorAll('.waiter-item');
+
+    const activeTableRow        = document.getElementById('activeTableRow');
+    const activeTableName       = document.getElementById('activeTableName');
+    const btnLihatMeja          = document.getElementById('btnLihatMeja');
+
+    let selectedTable = null; // { id, name, capacity, area }
+    let selectedWaiter = null; // { id, name }
+    let pilihMejaMode = ''; // 'save' or 'continue'
+
+    // Open Pilih Meja Overlay
+    if (btnSimpanBillTrigger && overlayPilihMeja) {
+        btnSimpanBillTrigger.addEventListener('click', () => {
+            if (cart.length === 0) {
+                showToast('Keranjang belanja kosong!', true);
+                return;
+            }
+            // Reset state
+            selectedTable = null;
+            selectedWaiter = null;
+            tableAvailableCards.forEach(c => c.classList.remove('active-table-card'));
+            
+            // Disable actions
+            btnSimpanSebagaiBill.style.opacity = '0.6';
+            btnSimpanSebagaiBill.style.pointerEvents = 'none';
+            btnMejaLanjutkan.style.background = '#d1d5db';
+            btnMejaLanjutkan.style.color = '#9ca3af';
+            btnMejaLanjutkan.style.pointerEvents = 'none';
+
+            overlayPilihMeja.style.display = 'flex';
+        });
+    }
+
+    // Batal Pilih Meja
+    if (btnPilihMejaBatal && overlayPilihMeja) {
+        btnPilihMejaBatal.addEventListener('click', () => {
+            overlayPilihMeja.style.display = 'none';
+        });
+    }
+
+    // Switch Area Grid Tabs
+    areaTabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            areaTabBtns.forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'transparent';
+            });
+            btn.classList.add('active');
+            btn.style.background = '#922014';
+
+            const areaId = btn.dataset.id;
+            document.querySelectorAll('.area-grid-view').forEach(view => {
+                view.style.display = view.id === `areaGridView_${areaId}` ? 'grid' : 'none';
+            });
+        });
+    });
+
+    // Table Selection inside Grid
+    tableAvailableCards.forEach(card => {
+        card.addEventListener('click', () => {
+            tableAvailableCards.forEach(c => c.classList.remove('active-table-card'));
+            card.classList.add('active-table-card');
+
+            selectedTable = {
+                id: card.dataset.id,
+                name: card.dataset.name,
+                capacity: card.dataset.capacity,
+                area: card.dataset.area
+            };
+
+            // Enable action buttons
+            btnSimpanSebagaiBill.style.opacity = '1';
+            btnSimpanSebagaiBill.style.pointerEvents = 'auto';
+            
+            btnMejaLanjutkan.style.background = 'var(--primary)';
+            btnMejaLanjutkan.style.color = '#fff';
+            btnMejaLanjutkan.style.pointerEvents = 'auto';
+        });
+    });
+
+    // Handle "Simpan Sebagai Bill" and "Lanjutkan"
+    function openBillBaruModal(mode) {
+        if (!selectedTable) return;
+        pilihMejaMode = mode;
+        if (billBaruSubTitle) {
+            billBaruSubTitle.innerText = `${selectedTable.name} - ${selectedTable.area}`;
+        }
+        if (inputPax) inputPax.value = '';
+        
+        // Reset Waiter List
+        selectedWaiter = null;
+        waiterItems.forEach(item => {
+            item.classList.remove('active-waiter');
+            item.style.background = ''; // reset backup style inline if any
+        });
+        
+        // Disable Konfirmasi Button
+        btnBillBaruKonfirmasi.style.opacity = '0.5';
+        btnBillBaruKonfirmasi.style.pointerEvents = 'none';
+
+        modalBillBaru.style.display = 'flex';
+    }
+
+    if (btnSimpanSebagaiBill) {
+        btnSimpanSebagaiBill.addEventListener('click', () => openBillBaruModal('save'));
+    }
+    if (btnMejaLanjutkan) {
+        btnMejaLanjutkan.addEventListener('click', () => openBillBaruModal('continue'));
+    }
+
+    // Modal Bill Baru Batal
+    if (btnBillBaruBatal && modalBillBaru) {
+        btnBillBaruBatal.addEventListener('click', () => {
+            modalBillBaru.style.display = 'none';
+        });
+    }
+
+    // Pax Minus / Plus Controls
+    if (btnPaxMinus && inputPax) {
+        btnPaxMinus.addEventListener('click', () => {
+            let val = parseInt(inputPax.value) || 1;
+            if (val > 1) inputPax.value = val - 1;
+        });
+    }
+    if (btnPaxPlus && inputPax) {
+        btnPaxPlus.addEventListener('click', () => {
+            let val = parseInt(inputPax.value) || 1;
+            if (val < 99) inputPax.value = val + 1;
+        });
+    }
+
+    // Waiter selection inside modal
+    waiterItems.forEach(item => {
+        item.addEventListener('click', () => {
+            waiterItems.forEach(i => i.classList.remove('active-waiter'));
+            item.classList.add('active-waiter');
+
+            selectedWaiter = {
+                id: item.dataset.id,
+                name: item.dataset.name
+            };
+
+            // Enable Konfirmasi Button
+            btnBillBaruKonfirmasi.style.opacity = '1';
+            btnBillBaruKonfirmasi.style.pointerEvents = 'auto';
+        });
+    });
+
+    // Konfirmasi button click
+    if (btnBillBaruKonfirmasi) {
+        btnBillBaruKonfirmasi.addEventListener('click', () => {
+            if (!selectedTable || !selectedWaiter) return;
+
+            const paxCount = parseInt(inputPax.value) || 1;
+
+            if (pilihMejaMode === 'save') {
+                const csrf = document.querySelector('meta[name="csrf-token"]');
+                if (!csrf) return;
+
+                // Cek apakah ini follow-up dari order yang sudah ada di DB
+                const existingOrderId = localStorage.getItem('active_order_id');
+                if (existingOrderId) {
+                    // UPDATE meja pada order pending yang sudah ada
+                    showLoading();
+                    modalBillBaru.style.display = 'none';
+                    overlayPilihMeja.style.display = 'none';
+
+                    fetch(`/pos/orders/${existingOrderId}/update-table`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf.getAttribute('content') },
+                        body: JSON.stringify({
+                            table_id:  selectedTable.id,
+                            pax:       paxCount,
+                            waiter_id: selectedWaiter.id,
+                        })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        hideLoading();
+                        if (data.success) {
+                            // Update active_table di localStorage juga
+                            localStorage.setItem('active_table', JSON.stringify({
+                                id: selectedTable.id,
+                                name: selectedTable.name,
+                                pax: paxCount,
+                                waiter_id: selectedWaiter.id,
+                                waiter_name: selectedWaiter.name,
+                            }));
+                            
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({
+                                    title: 'Berhasil!',
+                                    text: `Meja berhasil diubah ke ${selectedTable.name}.`,
+                                    icon: 'success',
+                                    timer: 1500,
+                                    showConfirmButton: false,
+                                    heightAuto: false
+                                }).then(() => {
+                                    window.location.reload();
+                                });
+                            } else {
+                                showToast(`Meja berhasil diubah ke ${selectedTable.name}.`);
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 1000);
+                            }
+                        } else {
+                            showToast(data.message || 'Gagal mengubah meja.', true);
+                        }
+                    })
+                    .catch(() => {
+                        hideLoading();
+                        showToast('Gagal terhubung ke server.', true);
+                    });
+                    return; // jangan lanjut ke flow save-bill baru
+                }
+
+                // AJAX: Buat Order baru (Pending)
+
+                // Calculate subtotal, discount, grand total
+                let subtotal = 0;
+                let discountAmount = 0;
+                cart.forEach(item => {
+                    subtotal += item.total_price;
+                    if (item.discounts && item.discounts.length > 0) {
+                        item.discounts.forEach(d => {
+                            if (d.type === 'percentage') discountAmount += item.total_price * (d.value / 100);
+                            else discountAmount += parseFloat(d.value);
+                        });
+                    }
+                });
+
+                const afterDiscount = subtotal - discountAmount;
+                let serviceCharge = 0;
+                if (window.POS_CONFIG && window.POS_CONFIG.serviceCharges) {
+                    cart.forEach(item => {
+                        let itemTotalDiscount = 0;
+                        if (item.discounts && item.discounts.length > 0) {
+                            item.discounts.forEach(d => {
+                                if (d.type === 'percentage') itemTotalDiscount += item.total_price * (d.value / 100);
+                                else itemTotalDiscount += parseFloat(d.value);
+                            });
+                        }
+                        let itemNet = item.total_price - itemTotalDiscount;
+                        let chargeConfig = window.POS_CONFIG.serviceCharges.find(c => {
+                            let typeKeyword = item.order_type === 'dine-in' ? 'dine' : item.order_type;
+                            return c.name.toLowerCase().includes(typeKeyword);
+                        });
+                        if (chargeConfig) {
+                            if (chargeConfig.type === 'percentage') serviceCharge += itemNet * (parseFloat(chargeConfig.value) / 100);
+                            else serviceCharge += parseFloat(chargeConfig.value);
+                        }
+                    });
+                }
+
+                let tax = 0;
+                if (window.POS_CONFIG && window.POS_CONFIG.taxes && window.POS_CONFIG.taxes.length > 0) {
+                    let taxConfig = window.POS_CONFIG.taxes[0];
+                    if (taxConfig.type === 'percentage') tax = afterDiscount * (parseFloat(taxConfig.value) / 100);
+                    else tax = parseFloat(taxConfig.value);
+                } else {
+                    tax = afterDiscount * 0.10;
+                }
+
+                const grandTotal = afterDiscount + serviceCharge + tax;
+
+                showLoading();
+                modalBillBaru.style.display = 'none';
+                overlayPilihMeja.style.display = 'none';
+
+                fetch('/pos/orders/save-bill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf.getAttribute('content') },
+                    body: JSON.stringify({
+                        table_id: selectedTable.id,
+                        pax: paxCount,
+                        waiter_id: selectedWaiter.id,
+                        cart: cart,
+                        subtotal: subtotal,
+                        discount_amount: discountAmount,
+                        total_final: grandTotal,
+                        tax_id: window.POS_CONFIG?.taxes?.[0]?.tax_id || null,
+                        service_charge_id: window.POS_CONFIG?.serviceCharges?.[0]?.service_charge_id || null,
+                        discount_id: cart[0]?.discounts?.[0]?.id || null // standard discount fallback
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    hideLoading();
+                    if (data.success) {
+                        cart = [];
+                        saveCart();
+                        localStorage.removeItem('active_table');
+                        localStorage.removeItem('active_order_id');
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                title: 'Berhasil!',
+                                text: 'Transaksi disimpan sebagai Bill.',
+                                icon: 'success',
+                                timer: 1500,
+                                showConfirmButton: false,
+                                heightAuto: false
+                            }).then(() => {
+                                window.location.reload();
+                            });
+                        } else {
+                            alert('Transaksi disimpan sebagai Bill.');
+                            window.location.reload();
+                        }
+                    } else {
+                        showToast(data.message || 'Gagal menyimpan transaksi.', true);
+                    }
+                })
+                .catch(() => {
+                    hideLoading();
+                    showToast('Gagal terhubung ke server.', true);
+                });
+
+            } else if (pilihMejaMode === 'continue') {
+                // Simpan ke in-memory session (localStorage) untuk ditampilkan di POS
+                const activeTableObj = {
+                    id: selectedTable.id,
+                    name: selectedTable.name,
+                    pax: paxCount,
+                    waiter_id: selectedWaiter.id,
+                    waiter_name: selectedWaiter.name
+                };
+
+                localStorage.setItem('active_table', JSON.stringify(activeTableObj));
+
+                // Close modals
+                modalBillBaru.style.display = 'none';
+                overlayPilihMeja.style.display = 'none';
+
+                // Render cart to reflect active table row
+                renderCart();
+                showToast(`Meja ${selectedTable.name} berhasil dipilih.`);
+            }
+        });
+    }
+
+    // Active Table Row triggers
+    if (btnLihatMeja && overlayPilihMeja) {
+        btnLihatMeja.addEventListener('click', () => {
+            // Open layout again
+            btnSimpanBillTrigger.click();
+        });
+    }
+
+    // =========================================================
+    // 12. DAFTAR BILL
+    // =========================================================
+    const modalDaftarBill   = document.getElementById('modalDaftarBill');
+    const btnDaftarBill     = document.getElementById('btnDaftarBill');
+    const btnDaftarBillTutup= document.getElementById('btnDaftarBillTutup');
+    const btnDaftarBillBaru = document.getElementById('btnDaftarBillBaru');
+    const daftarBillLoading = document.getElementById('daftarBillLoading');
+    const daftarBillTable   = document.getElementById('daftarBillTable');
+    const daftarBillRows    = document.getElementById('daftarBillRows');
+    const daftarBillEmpty   = document.getElementById('daftarBillEmpty');
+    const inputSearchBill   = document.getElementById('inputSearchBill');
+
+    let allBillsData = []; // cache for search
+
+    function renderBillRows(data) {
+        daftarBillRows.innerHTML = '';
+        if (!data || data.length === 0) {
+            daftarBillTable.style.display = 'none';
+            daftarBillEmpty.style.display = 'block';
+            return;
+        }
+        daftarBillEmpty.style.display = 'none';
+        daftarBillTable.style.display = 'table';
+
+        data.forEach(bill => {
+            const tr = document.createElement('tr');
+            tr.className = 'daftar-bill-row';
+            tr.dataset.orderId = bill.order_id;
+            tr.innerHTML = `
+                <td>${bill.meja}</td>
+                <td>${bill.grup_meja}</td>
+                <td>${bill.pelayan}</td>
+                <td>${bill.waktu}</td>
+                <td>
+                    <span class="daftar-bill-sync-icon" title="Sudah tersinkron">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="9 12 11 14 15 10"/>
+                        </svg>
+                    </span>
+                </td>
+            `;
+            daftarBillRows.appendChild(tr);
+        });
+    }
+
+    function loadPendingBills() {
+        daftarBillLoading.style.display = 'flex';
+        daftarBillTable.style.display   = 'none';
+        daftarBillEmpty.style.display   = 'none';
+
+        fetch('/pos/orders/pending-bills', {
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Accept': 'application/json',
+            }
+        })
+        .then(r => r.json())
+        .then(res => {
+            daftarBillLoading.style.display = 'none';
+            if (res.success) {
+                allBillsData = res.data;
+                renderBillRows(allBillsData);
+            } else {
+                daftarBillEmpty.style.display = 'block';
+            }
+        })
+        .catch(() => {
+            daftarBillLoading.style.display = 'none';
+            daftarBillEmpty.style.display = 'block';
+            daftarBillEmpty.textContent = 'Gagal memuat data bill.';
+        });
+    }
+
+    // Open modal
+    if (btnDaftarBill && modalDaftarBill) {
+        btnDaftarBill.addEventListener('click', () => {
+            modalDaftarBill.style.display = 'flex';
+            if (inputSearchBill) inputSearchBill.value = '';
+            loadPendingBills();
+        });
+    }
+
+    // Close modal
+    if (btnDaftarBillTutup && modalDaftarBill) {
+        btnDaftarBillTutup.addEventListener('click', () => {
+            modalDaftarBill.style.display = 'none';
+        });
+    }
+    if (modalDaftarBill) {
+        modalDaftarBill.addEventListener('click', e => {
+            if (e.target === modalDaftarBill) modalDaftarBill.style.display = 'none';
+        });
+    }
+
+    // "Bill Baru" button inside modal — close modal and open floor plan
+    if (btnDaftarBillBaru && modalDaftarBill && btnSimpanBillTrigger) {
+        btnDaftarBillBaru.addEventListener('click', () => {
+            modalDaftarBill.style.display = 'none';
+            btnSimpanBillTrigger.click();
+        });
+    }
+
+    // Tab switching (Open Bill only active for now, others show placeholder)
+    if (modalDaftarBill) {
+        modalDaftarBill.querySelectorAll('.daftar-bill-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                modalDaftarBill.querySelectorAll('.daftar-bill-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const tabName = tab.dataset.tab;
+                if (tabName === 'open') {
+                    loadPendingBills();
+                } else {
+                    // Placeholder for other tabs
+                    daftarBillLoading.style.display = 'none';
+                    daftarBillTable.style.display   = 'none';
+                    daftarBillEmpty.style.display   = 'block';
+                    daftarBillEmpty.textContent     = 'Fitur ini akan segera hadir.';
+                }
+            });
+        });
+    }
+
+    // Live search filter
+    if (inputSearchBill) {
+        inputSearchBill.addEventListener('input', () => {
+            const q = inputSearchBill.value.trim().toLowerCase();
+            if (!q) {
+                renderBillRows(allBillsData);
+                return;
+            }
+            const filtered = allBillsData.filter(b =>
+                b.meja.toLowerCase().includes(q) ||
+                b.grup_meja.toLowerCase().includes(q) ||
+                b.pelayan.toLowerCase().includes(q)
+            );
+            renderBillRows(filtered);
+        });
+    }
+
+    // =========================================================
+    // 13. FOLLOW-UP BILL (klik baris daftar bill → restore ke POS)
+    // =========================================================
+    // Gunakan delegasi event karena baris di-render secara dinamis
+    if (daftarBillRows) {
+        daftarBillRows.addEventListener('click', (e) => {
+            const row = e.target.closest('.daftar-bill-row');
+            if (!row) return;
+            const orderId = row.dataset.orderId;
+            if (!orderId) return;
+
+            showLoading();
+            fetch(`/pos/orders/${orderId}/detail`, {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Accept': 'application/json',
+                }
+            })
+            .then(r => r.json())
+            .then(res => {
+                hideLoading();
+                if (!res.success) {
+                    showToast('Gagal memuat detail bill.', true);
+                    return;
+                }
+
+                const order = res.order;
+
+                // 1. Simpan activeOrderId agar saat ganti meja bisa UPDATE, bukan INSERT baru
+                localStorage.setItem('active_order_id', order.order_id);
+
+                // 2. Restore cart dari order items
+                cart = res.cart.map((item, idx) => ({
+                    ...item,
+                    id: item.id || (Date.now() + idx),
+                }));
+                saveCart();
+
+                // 3. Set active_table seperti alur "Lanjutkan"
+                if (order.table_id) {
+                    const activeTableObj = {
+                        id:           order.table_id,
+                        name:         order.meja,
+                        pax:          order.pax,
+                        waiter_id:    order.waiter_id,
+                        waiter_name:  order.waiter_name,
+                    };
+                    localStorage.setItem('active_table', JSON.stringify(activeTableObj));
+                } else {
+                    localStorage.removeItem('active_table');
+                }
+
+                // 3. Set order type global sesuai order
+                selectedOrderType = order.order_type || 'dine-in';
+                if (labelOrderType) {
+                    labelOrderType.innerText = orderTypeLabels[selectedOrderType] || selectedOrderType;
+                }
+
+                // 4. Tutup modal daftar bill
+                if (modalDaftarBill) modalDaftarBill.style.display = 'none';
+
+                // 5. Re-render cart (tampilkan item + active table row)
+                renderCart();
+                showToast(`Bill meja ${order.meja} berhasil dibuka.`);
+            })
+            .catch(() => {
+                hideLoading();
+                showToast('Gagal terhubung ke server.', true);
+            });
+        });
+    }
+
+    // =========================================================
+    // 14. INIT
     // =========================================================
     renderCart();
 

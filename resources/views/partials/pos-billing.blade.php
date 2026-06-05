@@ -10,9 +10,7 @@
     {{-- HEADER: Daftar Bill + Tambah Pelanggan --}}
     <div class="bill-header">
         <button class="btn-daftar-bill" id="btnDaftarBill">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
+            <img src="{{ asset('assets/listbill_icon.png') }}" alt="Daftar Bill" style="width: 32px; height: 32px; object-fit: contain;">
             Daftar Bill
         </button>
         <button class="btn-tambah-pelanggan">+ Tambah Pelanggan</button>
@@ -23,6 +21,12 @@
         <span class="order-type-label" id="labelOrderType">Dine In</span>
         <img src="{{ asset('assets/chevron_down.png') }}" alt="▾" class="order-type-chevron-img">
     </button>
+
+    {{-- ACTIVE TABLE ROW (Tabel Terpilih - Lanjutkan) --}}
+    <div class="active-table-row" id="activeTableRow" style="display: none; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #fca5a5; background: #fff1f2;">
+        <span class="active-table-name" id="activeTableName" style="color: var(--primary); font-weight: 600; font-size: 0.95rem;">Table VIP</span>
+        <button class="btn-lihat-meja" id="btnLihatMeja" style="background: none; border: none; color: var(--primary); font-weight: 600; font-size: 0.95rem; cursor: pointer; padding: 0;">Lihat Meja</button>
+    </div>
 
     {{-- SCROLL AREA: cart items + summary (keduanya ikut scroll) --}}
     <div class="bill-scroll-area">
@@ -68,14 +72,12 @@
     {{-- FOOTER ACTIONS --}}
     <div class="bill-footer">
         <div class="bill-actions-row">
-            <button class="btn-simpan">Simpan Bill</button>
+            <button class="btn-simpan" id="btnSimpanBillTrigger">Simpan Bill</button>
             <button class="btn-cetak">Cetak Bill</button>
         </div>
         <div class="bill-pay-row">
-            <button class="btn-pisah">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 6h18M3 14h9m-9 4h9" />
-                </svg>
+            <button class="btn-pisah" id="btnPisahBill" disabled style="opacity: 1; pointer-events: none;">
+                <img src="{{ asset('assets/splitbill_icon.png') }}" alt="Pisah Bill" style="width: 32px; height: 32px; object-fit: contain;">
                 Pisah Bill
             </button>
             <button class="btn-bayar" id="totalBayar">Bayar Rp 0</button>
@@ -175,6 +177,93 @@
     </div>
 </div>
 
+{{-- MODAL: Daftar Bill --}}
+<div class="modal-overlay" id="modalDaftarBill" style="display:none;">
+    <div class="loyalty-modal">
+        {{-- Header --}}
+        <div class="loyalty-modal-header">
+            <button class="btn-loyalty-outline" id="btnDaftarBillTutup">Tutup</button>
+            <h3 class="loyalty-modal-title">Daftar Bill</h3>
+            <button class="btn-loyalty-outline" id="btnDaftarBillBaru">Bill Baru</button>
+        </div>
+        <div class="loyalty-modal-divider"></div>
+
+        {{-- Tabs --}}
+        <div class="daftar-bill-tabs">
+            <button class="daftar-bill-tab active" data-tab="open">Open Bill</button>
+            <button class="daftar-bill-tab" data-tab="pembatalan-bill">Pembatalan Bill</button>
+            <button class="daftar-bill-tab" data-tab="pembatalan-produk">Pembatalan Produk</button>
+        </div>
+
+        {{-- Search --}}
+        <div class="daftar-bill-search-wrap">
+            <input type="text" id="inputSearchBill" class="daftar-bill-search" placeholder="Cari Open Bill">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="daftar-bill-search-icon">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+        </div>
+
+        {{-- Table Header --}}
+        <div class="daftar-bill-table-header">
+            <span>MEJA</span>
+            <span>GRUP MEJA</span>
+            <span>PELAYAN</span>
+            <span>WAKTU</span>
+            <span>SYNC</span>
+        </div>
+
+        {{-- Body —— rows rendered by JS --}}
+        <div class="loyalty-modal-body" id="daftarBillBody" style="padding: 0; overflow-y: auto; flex: 1;">
+            <div class="daftar-bill-loading" id="daftarBillLoading" style="display:flex; align-items:center; justify-content:center; padding: 48px 0; color:#9ca3af; font-size:0.95rem;">
+                <svg style="margin-right:10px; animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                Memuat data...
+            </div>
+            <table class="daftar-bill-table" id="daftarBillTable" style="display:none; width:100%; border-collapse:collapse;">
+                <tbody id="daftarBillRows"></tbody>
+            </table>
+            <div id="daftarBillEmpty" style="display:none; text-align:center; padding: 48px 0; color:#9ca3af; font-size:0.95rem;">
+                Tidak ada open bill saat ini.
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- MODAL: Pisah Bill --}}
+<div class="modal-overlay" id="modalPisahBill" style="display:none;">
+    <div class="loyalty-modal">
+        {{-- Header --}}
+        <div class="loyalty-modal-header">
+            <button class="btn-loyalty-outline" id="btnPisahBillTutup" style="border: 1px solid #c43626; color: #c43626;">Tutup</button>
+            <h3 class="loyalty-modal-title">Pisah Bill</h3>
+            <button class="btn-loyalty-outline" id="btnPisahBillPisahkan" style="background: #c43626; color: #fff; border: none; font-weight: 600;">Pisahkan</button>
+        </div>
+        <div class="loyalty-modal-divider"></div>
+
+        {{-- Body --}}
+        <div class="loyalty-modal-body" style="padding: 24px 32px; display: flex; flex-direction: column; overflow-y: auto;">
+            {{-- Jumlah yang dipisahkan display --}}
+            <div class="pisah-bill-box">
+                <span class="pisah-bill-box-label">Jumlah yang dipisahkan</span>
+                <span class="pisah-bill-box-val" id="pisahBillAmountDisplay">Rp 0</span>
+            </div>
+
+            {{-- Label --}}
+            <div class="pisah-bill-section-title">Produk yang Dipisahkan</div>
+
+            {{-- Grouped items list --}}
+            <div id="pisahBillProductList" style="flex: 1; display: flex; flex-direction: column;">
+                {{-- Dynamically populated by JS --}}
+            </div>
+
+            {{-- Summary details (discounts, taxes, etc.) --}}
+            <div id="pisahBillBreakdown" style="border-top: 1px solid #e5e7eb; margin-top: 20px; padding-top: 12px; display: flex; flex-direction: column; gap: 4px;">
+                {{-- Dynamically populated by JS based on selected items --}}
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- MODAL: Pilih Pelayan --}}
 <div class="modal-overlay" id="modalStaff" style="display:none;">
     <div class="loyalty-modal">
@@ -266,20 +355,20 @@
                 </div>
                 <div class="payment-content-col">
                     <div class="payment-btn-group">
-                        <button class="btn-payment-outline" style="padding: 6px 12px; display:flex; justify-content:center; align-items:center; height: 42px;">
+                        <button class="btn-payment-outline" data-method="ewallet" style="padding: 6px 12px; display:flex; justify-content:center; align-items:center; height: 42px;">
                             <img src="{{ asset('assets/dana.png') }}" alt="DANA" style="height: 24px; object-fit: contain;">
                         </button>
-                        <button class="btn-payment-outline" style="padding: 6px 12px; display:flex; justify-content:center; align-items:center; height: 42px;">
+                        <button class="btn-payment-outline" data-method="ewallet" style="padding: 6px 12px; display:flex; justify-content:center; align-items:center; height: 42px;">
                             <img src="{{ asset('assets/shopeepay.png') }}" alt="ShopeePay" style="max-height: 24px; object-fit: contain;">
                         </button>
-                        <button class="btn-payment-outline" style="padding: 6px 12px; display:flex; justify-content:center; align-items:center; height: 42px;">
+                        <button class="btn-payment-outline" data-method="ewallet" style="padding: 6px 12px; display:flex; justify-content:center; align-items:center; height: 42px;">
                             <img src="{{ asset('assets/gopay.png') }}" alt="GoPay" style="height: 24px; object-fit: contain;">
                         </button>
                     </div>
                 </div>
             </div>
 
-            {{-- EDC --}}
+            <!-- {{-- EDC --}}
             <div class="payment-section payment-grid-section">
                 <div class="payment-label-col">
                     <div class="payment-label-title">EDC</div>
@@ -305,9 +394,9 @@
                     </div>
                     <input type="text" class="loyalty-input" style="width: 100%; border: 1px solid var(--primary); border-radius: 4px; margin-top: 12px; font-size: 1rem; padding: 12px;" placeholder="Catatan Tambahan">
                 </div>
-            </div>
+            </div> -->
 
-            {{-- Invoice --}}
+            <!-- {{-- Invoice --}}
             <div class="payment-section payment-grid-section" style="border-bottom: none;">
                 <div class="payment-label-col">
                     <div class="payment-label-title">Invoice</div>
@@ -324,8 +413,185 @@
                         Invoice
                     </button>
                 </div>
+            </div> -->
+
+        </div>
+    </div>
+</div>
+
+{{-- MODAL: Pembayaran Tunai Sukses --}}
+<div class="modal-full-overlay" id="modalTunaiSuccess" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#fff; z-index:9999; flex-direction:column;">
+    {{-- Header Full Width --}}
+    <div style="width: 100%; padding: 32px 48px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="color:var(--primary); font-weight:700; font-size:1.4rem;">TUNAI</div>
+        <button id="btnBatalTunai" style="background:transparent; border:1px solid var(--primary); color:var(--primary); padding:8px 24px; border-radius:4px; font-weight:600; cursor:pointer;">Batal</button>
+    </div>
+
+    {{-- Content Center --}}
+    <div style="width:100%; max-width:500px; margin: 0 auto; display:flex; flex-direction:column; align-items:center;">
+        <div style="font-size:1.2rem; color:#333;">Bayar <span id="tunaiSuccessBayar">Rp 0</span></div>
+        <div style="margin-top:24px; font-size:2rem; font-weight:600; color:var(--primary);">Kembalian</div>
+        <div style="margin-top:8px; font-size:2rem; font-weight:600; color:var(--primary);" id="tunaiSuccessKembalian">Rp 0</div>
+        
+        <img src="{{ asset('assets/payment_check.png') }}" alt="Check" style="width:120px; margin-top:32px;">
+        
+        <div style="width:100%; margin-top:32px;">
+            <div style="display:flex; margin-bottom:16px;">
+                <input type="email" placeholder="Struk Email" style="flex:1; padding:12px; border:1px solid #9ca3af; border-radius:4px 0 0 4px; outline:none; font-family:inherit; font-size:1rem;">
+                <button style="background:#f87171; color:white; border:none; padding:0 24px; border-radius:0 4px 4px 0; font-weight:600; cursor:pointer;">Kirim</button>
+            </div>
+            <div style="display:flex; margin-bottom:24px;">
+                <input type="text" placeholder="+62" style="flex:1; padding:12px; border:1px solid #9ca3af; border-radius:4px 0 0 4px; outline:none; font-family:inherit; font-size:1rem;">
+                <button style="background:var(--primary); color:white; border:none; padding:0 24px; border-radius:0 4px 4px 0; font-weight:600; cursor:pointer;">Kirim</button>
+            </div>
+        </div>
+        
+        <button style="width:100%; background:var(--primary); color:white; border:none; padding:14px; border-radius:4px; font-weight:600; font-size:1.05rem; cursor:pointer; margin-bottom:16px;">Cetak Struk</button>
+        <button id="btnTransaksiBaru" style="width:100%; background:transparent; color:var(--primary); border:1px solid var(--primary); padding:14px; border-radius:4px; font-weight:600; font-size:1.05rem; cursor:pointer;">Transaksi Baru</button>
+    </div>
+</div>
+
+{{-- MODAL: Pembayaran QRIS / E-Wallet --}}
+<div class="modal-full-overlay" id="modalQris" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#fff; z-index:9999; flex-direction:column;">
+    {{-- Header Full Width --}}
+    <div style="width: 100%; padding: 32px 48px; display: flex; justify-content: space-between; align-items: flex-start;">
+        <div style="display:flex; align-items:center;">
+            <img src="{{ asset('assets/qris.png') }}" alt="QRIS" style="height: 32px; object-fit: contain; margin-right: 12px;">
+        </div>
+        <button id="btnBatalQris" style="background:transparent; border:1px solid var(--primary); color:var(--primary); padding:8px 24px; border-radius:4px; font-weight:600; cursor:pointer;">Batal</button>
+    </div>
+
+    {{-- Content Center --}}
+    <div style="width:100%; max-width:500px; margin: 0 auto; display:flex; flex-direction:column; align-items:center;">
+        <div style="margin-top:24px; font-size:1.2rem; color:#333;">Total Harga</div>
+        <div style="margin-top:8px; font-size:2rem; font-weight:600; color:var(--primary);" id="qrisTotalHargaDisplay">Rp 0</div>
+        
+        <div style="margin-top:32px; padding:16px; border:1px solid #e5e7eb; border-radius:8px;">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=JayaPOS" alt="QR Code" style="width:200px; height:200px;">
+        </div>
+        
+        <button style="width:100%; max-width:300px; background:transparent; color:var(--primary); border:1px solid var(--primary); padding:12px; border-radius:4px; font-weight:600; cursor:pointer; margin-top:32px;">Cetak QR Code</button>
+        
+        <div style="text-align:center; margin-top:32px;">
+            <div style="font-weight:700; color:#111; margin-bottom:4px;">Toko Kopi Jaya Tenes</div>
+            <div style="color:#111;">Jl. Tenes</div>
+        </div>
+        
+        <div style="margin-top:32px; position:relative; width:80px; height:80px; display:flex; justify-content:center; align-items:center;">
+            <svg width="80" height="80" style="position:absolute; transform:rotate(-90deg);">
+                <circle cx="40" cy="40" r="36" fill="none" stroke="#e5e7eb" stroke-width="8"></circle>
+                <circle cx="40" cy="40" r="36" fill="none" stroke="var(--primary)" stroke-width="8" stroke-dasharray="226" stroke-dashoffset="0" id="qrisProgressCircle" style="transition: stroke-dashoffset 1s linear;"></circle>
+            </svg>
+            <div id="qrisCountdownText" style="font-size:1.2rem; font-weight:600; color:#111;">60</div>
+        </div>
+        
+        <div style="margin-top:24px; font-size:0.85rem; color:#9ca3af;">Transaksi e-wallet tidak bisa di refund</div>
+    </div>
+</div>
+
+{{-- MODAL: Konfirmasi Batal QRIS --}}
+<div class="modal-overlay" id="modalBatalQrisConfirm" style="display:none; z-index: 10000;">
+    <div class="loyalty-modal" style="width: 90%; max-width: 400px; height: auto; text-align: center; padding: 32px 24px;">
+        <h3 style="margin-top: 0; margin-bottom: 24px; font-size: 1.25rem;">Batalkan Transaksi?</h3>
+        <button class="btn-loyalty-check" id="btnConfirmBatalQris" style="width: 100%; padding: 12px; border-radius: 4px; border: none; font-size: 1rem; cursor: pointer; color: white; margin-bottom: 12px;">Iya</button>
+        <button class="btn-loyalty-outline" id="btnCancelBatalQris" style="width: 100%;">Tidak</button>
+    </div>
+</div>
+
+{{-- OVERLAY: Pilih Meja (Denah Meja) --}}
+<div class="modal-full-overlay" id="overlayPilihMeja" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#f3f4f6; z-index:999; flex-direction:column; font-family: 'Inter', sans-serif;">
+    {{-- Header --}}
+    <div style="width:100%; background:#fff; padding:16px 32px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <button id="btnPilihMejaBatal" style="background:#fff; border:1px solid #ef4444; color:#ef4444; padding:10px 24px; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.95rem; transition: all 0.2s;">Batal</button>
+        <h2 style="margin:0; font-size:1.4rem; font-weight:700; color:#111827;">Pilih Meja</h2>
+        <div style="display:flex; gap:12px;">
+            <button id="btnSimpanSebagaiBill" class="btn-meja-action" style="background:#fff; border:1px solid #c43626; color:#c43626; padding:10px 20px; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.95rem; opacity: 0.6; pointer-events: none;">Simpan Sebagai Bill</button>
+            <button id="btnMejaLanjutkan" class="btn-meja-action" style="background:#d1d5db; border:none; color:#9ca3af; padding:10px 24px; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.95rem; pointer-events: none;">Lanjutkan</button>
+        </div>
+    </div>
+
+    {{-- Main Area Container --}}
+    <div id="pilihMejaContent" style="flex:1; overflow-y:auto; padding:40px 32px; display:flex; justify-content:center; align-items:center;">
+        @if(isset($areas) && count($areas) > 0)
+            @foreach($areas as $areaIdx => $area)
+                <div class="area-grid-view" id="areaGridView_{{ $area->area_id }}" style="display: {{ $areaIdx === 0 ? 'grid' : 'none' }}; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 24px; width: 100%; max-width: 900px; justify-content: center; align-content: center;">
+                    @foreach($area->tables as $table)
+                        @if($table->status === 'occupied')
+                            {{-- Occupied Table --}}
+                            <div class="table-card table-occupied" style="background:#d1d5db; border-radius:50%; width:110px; height:110px; margin:0 auto; display:flex; flex-direction:column; justify-content:center; align-items:center; cursor:not-allowed; box-shadow:0 4px 6px rgba(0,0,0,0.05); color:#6b7280;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="margin-bottom:4px;">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                                </svg>
+                                <span style="font-size:0.75rem; font-weight:600; opacity:0.8;">Terisi</span>
+                            </div>
+                        @else
+                            {{-- Available Table --}}
+                            <div class="table-card table-available" data-id="{{ $table->table_id }}" data-name="{{ $table->name }}" data-capacity="{{ $table->capacity }}" data-area="{{ $area->name }}" style="background:#fff; border-radius:12px; height:100px; display:flex; flex-direction:column; justify-content:center; align-items:center; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.05); transition:all 0.2s; border: 2px solid transparent;" onmouseover="this.style.transform='scale(1.03)';" onmouseout="this.style.transform='scale(1)';">
+                                <span style="font-weight:700; color:#374151; font-size:1rem;">{{ $table->name }}</span>
+                                <span style="font-size:0.8rem; color:#9ca3af; margin-top:4px;">0 / {{ $table->capacity }}</span>
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+            @endforeach
+        @else
+            <div style="color:#6b7280; font-size:1.1rem;">Belum ada denah meja yang di-setup.</div>
+        @endif
+    </div>
+
+    {{-- Bottom Tab Bar --}}
+    @include('partials.pos-bottom-nav', ['isFloorPlan' => true])
+</div>
+
+{{-- MODAL: Bill Baru (Jumlah Pelanggan & Pelayan) --}}
+<div class="modal-overlay" id="modalBillBaru" style="display:none; z-index: 1000; font-family: 'Inter', sans-serif;">
+    <div class="loyalty-modal">
+        {{-- Header --}}
+        <div class="loyalty-modal-header" style="align-items: center;">
+            <button id="btnBillBaruBatal" class="btn-loyalty-outline">Batal</button>
+            <div style="display:flex; flex-direction:column; align-items:center; text-align:center; flex:1; padding: 0 16px;">
+                <span class="loyalty-modal-title" style="font-size:1.3rem; font-weight:700; color: #111;">Bill Baru</span>
+                <span id="billBaruSubTitle" style="font-size:0.95rem; color:#4b5563; margin-top:4px; font-weight:500;">Table VIP - Outdoor 1</span>
+            </div>
+            <button id="btnBillBaruKonfirmasi" class="btn-loyalty-check" style="height: 44px; border-radius: 4px; opacity: 0.5; pointer-events: none;">Konfirmasi</button>
+        </div>
+
+        <div class="loyalty-modal-divider"></div>
+
+        {{-- Body --}}
+        <div class="loyalty-modal-body" style="padding: 24px 32px 32px 32px; background: #fff;">
+            {{-- Section 1: Pax Input (Mockup style) --}}
+            <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; background: #fff; transition: border-color 0.2s;" class="pax-input-wrapper">
+                <span style="font-weight: 700; color: #111827; font-size: 1.05rem;">Pax</span>
+                <input type="number" id="inputPax" placeholder="Masukkan jumlah pax" style="border: none; outline: none; text-align: right; font-size: 1.05rem; color: #111827; width: 60%; font-family: inherit; font-weight: 500;" value="1" min="1" max="99">
             </div>
 
+            {{-- Section 2: Waiter Selector (Checkout list style) --}}
+            <div style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                <label style="display:block; font-size:0.8rem; font-weight:700; color:#111827; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:12px;">PILIH PELAYAN</label>
+                <div id="waiterSelectionList" class="staff-modal-body" style="flex:1; gap:0; overflow-y:auto; border-top: 1px solid #e5e7eb;">
+                    @if(isset($staffs) && count($staffs) > 0)
+                        @foreach($staffs as $staff)
+                            <div class="staff-list-item waiter-item" data-id="{{ $staff->staff_id }}" data-name="{{ $staff->name }}" style="display:flex; align-items:center; justify-content:space-between; padding:16px 32px; border-bottom:1px solid #e5e7eb; cursor:pointer;">
+                                <div style="display:flex; align-items:center;">
+                                    <div class="staff-icon" style="margin-right:16px;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                            <circle cx="12" cy="7" r="4"></circle>
+                                        </svg>
+                                    </div>
+                                    <div class="staff-name">{{ $staff->name }}</div>
+                                </div>
+                                <div style="font-size:1.05rem; color:#4b5563; font-weight:400;">
+                                    {{ ucfirst($staff->role === 'cashier' ? 'Kasir' : $staff->role) }}
+                                </div>
+                            </div>
+                        @endforeach
+                    @else
+                        <div style="text-align:center; color:#9ca3af; padding:32px 0;">Belum ada pelayan aktif.</div>
+                    @endif
+                </div>
+            </div>
         </div>
     </div>
 </div>
