@@ -914,6 +914,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const paymentServerName = document.getElementById('paymentServerName');
     
     let selectedStaffName = '-';
+    let selectedStaffId = null;
 
     function openPaymentModal() {
         if (modalStaff) modalStaff.style.display = 'none';
@@ -983,6 +984,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetStaffSelection() {
         selectedStaffName = '-';
+        selectedStaffId = null;
         const staffItems = document.querySelectorAll('.staff-list-item');
         if(staffItems) staffItems.forEach(i => i.style.background = '');
         
@@ -1017,6 +1019,7 @@ document.addEventListener('DOMContentLoaded', () => {
             item.style.background = '#f3f4f6';
 
             selectedStaffName = item.dataset.name;
+            selectedStaffId = item.dataset.id;
             
             // Ubah tombol "Lewati" menjadi "Konfirmasi"
             if (btnLewatiStaff) {
@@ -1057,7 +1060,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btnProsesPayment.addEventListener('click', () => {
             const activeBtn = document.querySelector('.payment-modal-body .btn-payment-outline.active');
             const inputTunaiManual = document.getElementById('inputTunaiManual');
-            
             let tunaiValue = 0;
             if (inputTunaiManual && inputTunaiManual.value) {
                 tunaiValue = parseInt(inputTunaiManual.value.toString().replace(/\D/g, '')) || 0;
@@ -1090,28 +1092,101 @@ document.addEventListener('DOMContentLoaded', () => {
                     }, 1000);
                 }
             } else {
+                // ---- CASH PAYMENT ----
                 let bayar = tunaiValue;
                 if (bayar < activeTotal) {
                     showToast('Nominal pembayaran kurang dari total!', true);
                     return;
                 }
+
+                // Kumpulkan data aktif meja & order
+                const activeTable = JSON.parse(localStorage.getItem('active_table') || 'null');
+                const activeOrderId = localStorage.getItem('active_order_id') || null;
+
+                // Tentukan order_type dari item pertama di cart (fallback dine-in)
+                const orderType = cart.length > 0 ? (cart[0].order_type || 'dine-in') : 'dine-in';
+
+                // Kumpulkan tax_id, service_charge_id, discount_id dari POS_CONFIG (jika ada)
+                const taxId = (window.POS_CONFIG?.taxes?.[0]?.tax_id) || null;
                 
-                modalPayment.style.display = 'none';
-                document.getElementById('tunaiSuccessBayar').innerText = `Rp ${bayar.toLocaleString('id-ID')}`;
-                const kembalian = bayar - activeTotal;
-                document.getElementById('tunaiSuccessKembalian').innerText = `Rp ${kembalian.toLocaleString('id-ID')}`;
-                modalTunaiSuccess.style.display = 'flex';
+                let scConfig = window.POS_CONFIG?.serviceCharges?.find(c => {
+                    let typeKeyword = orderType === 'dine-in' ? 'dine' : orderType;
+                    return c.name.toLowerCase().includes(typeKeyword);
+                });
+                const serviceChargeId = scConfig ? scConfig.service_charge_id : null;
+                
+                const discountId = null; // belum ada fitur select diskon global
+
+                // Hitung subtotal (sebelum tax/charge)
+                let rawSubtotal    = cart.reduce((s, i) => s + i.total_price, 0);
+                let totalDiscAmt   = 0;
+                cart.forEach(i => {
+                    if (i.discounts && i.discounts.length > 0) {
+                        i.discounts.forEach(d => {
+                            if (d.type === 'percentage') totalDiscAmt += i.total_price * (d.value / 100);
+                            else totalDiscAmt += parseFloat(d.value);
+                        });
+                    }
+                });
+
+                const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+                // Disable tombol agar tidak double-submit
+                btnProsesPayment.disabled = true;
+                btnProsesPayment.innerText = 'Memproses...';
+
+                fetch('/pos/checkout/cash', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                    body: JSON.stringify({
+                        cart:               cart,
+                        subtotal:           rawSubtotal,
+                        discount_amount:    totalDiscAmt,
+                        total_final:        activeTotal,
+                        amount_paid:        bayar,
+                        order_type:         orderType,
+                        table_id:           activeTable?.id || null,
+                        table_number:       activeTable?.name || '',
+                        pax:                1,
+                        waiter_id:          selectedStaffId,
+                        tax_id:             taxId,
+                        service_charge_id:  serviceChargeId,
+                        discount_id:        discountId,
+                    }),
+                })
+                .then(r => r.json())
+                .then(resp => {
+                    btnProsesPayment.disabled = false;
+                    btnProsesPayment.innerText = 'Proses Pembayaran';
+
+                    if (!resp.success) {
+                        showToast(resp.message || 'Gagal menyimpan transaksi.', true);
+                        return;
+                    }
+
+                    // Simpan order_id hasil checkout untuk referensi struk nanti
+                    window.lastOrderId = resp.order_id;
+
+                    // Tampilkan modal sukses
+                    modalPayment.style.display = 'none';
+                    document.getElementById('tunaiSuccessBayar').innerText = `Rp ${bayar.toLocaleString('id-ID')}`;
+                    const kembalian = bayar - activeTotal;
+                    document.getElementById('tunaiSuccessKembalian').innerText = `Rp ${kembalian.toLocaleString('id-ID')}`;
+                    modalTunaiSuccess.style.display = 'flex';
+                })
+                .catch(err => {
+                    btnProsesPayment.disabled = false;
+                    btnProsesPayment.innerText = 'Proses Pembayaran';
+                    showToast('Koneksi bermasalah. Coba lagi.', true);
+                    console.error(err);
+                });
             }
         });
     }
 
-    const btnBatalTunai = document.getElementById('btnBatalTunai');
-    
-    if (btnBatalTunai) {
-        btnBatalTunai.addEventListener('click', () => {
-            if(modalBatalQrisConfirm) modalBatalQrisConfirm.style.display = 'flex';
-        });
-    }
 
     if (btnBatalQris) {
         btnBatalQris.addEventListener('click', () => {

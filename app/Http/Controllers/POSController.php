@@ -7,6 +7,8 @@ use App\Models\Product;
 use App\Models\Favorite;
 use App\Models\Modifier;
 use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -398,6 +400,123 @@ class POSController extends Controller
             return response()->json(['success' => true, 'message' => 'Meja berhasil diupdate.']);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    // ==========================================
+    // AJAX: Checkout Cash
+    // ==========================================
+    public function checkoutCash(Request $request)
+    {
+        $request->validate([
+            'cart'        => 'required|array|min:1',
+            'subtotal'    => 'required|numeric|min:0',
+            'total_final' => 'required|numeric|min:0',
+            'amount_paid' => 'required|numeric|min:0',
+            'order_type'  => 'required|string',
+        ]);
+
+        $outletId = session('active_outlet');
+        $staffId  = auth()->user()->staff_id;
+        $createdOrderId = null;
+
+        try {
+            DB::transaction(function () use ($request, $outletId, $staffId, &$createdOrderId) {
+
+                // 1. INSERT orders (langsung status paid)
+                $tableId   = $request->table_id ?: null;
+                $tableName = $tableId
+                    ? (\App\Models\Table::find($tableId)->name ?? '')
+                    : ($request->table_number ?? '');
+
+                $order = Order::create([
+                    'staff_id'          => $staffId,
+                    'outlet_id'         => $outletId,
+                    'source'            => 'POS - In-Store',
+                    'order_type'        => $request->order_type,
+                    'table_id'          => $tableId,
+                    'table_number'      => $tableName,
+                    'pax'               => $request->pax ?? 1,
+                    'waiter_id'         => $request->waiter_id ?: null,
+                    'status'            => 'paid',
+                    'subtotal'          => $request->subtotal,
+                    'tax_id'            => $request->tax_id ?: null,
+                    'service_charge_id' => $request->service_charge_id ?: null,
+                    'discount_id'       => $request->discount_id ?: null,
+                    'discount_amount'   => $request->discount_amount ?? 0,
+                    'total_final'       => $request->total_final,
+                    'points_earned'     => 0,
+                    'created_at'        => now(),
+                ]);
+
+                // Set paid_at agar trigger kredit poin berjalan
+                DB::table('orders')
+                    ->where('order_id', $order->order_id)
+                    ->update(['paid_at' => now()]);
+
+                $createdOrderId = $order->order_id;
+
+                // 2. INSERT order_items + modifiers
+                foreach ($request->cart as $item) {
+                    $productId   = $item['product_id'];
+                    $isCustom    = str_starts_with((string)$productId, 'custom_');
+                    $dbProductId = $isCustom ? 999 : (int)$productId;
+
+                    $orderItem = OrderItem::create([
+                        'order_id'          => $order->order_id,
+                        'product_id'        => $dbProductId,
+                        'quantity'          => $isCustom ? 1 : (int)$item['qty'],
+                        'price_at_purchase' => $isCustom
+                            ? (float)$item['total_price']
+                            : (float)$item['unit_price'],
+                        'created_at'        => now(),
+                    ]);
+
+                    if (!empty($item['modifiers']) && is_array($item['modifiers'])) {
+                        foreach ($item['modifiers'] as $mod) {
+                            DB::table('order_item_modifier')->insert([
+                                'order_item_id' => $orderItem->order_item_id,
+                                'modifier_id'   => (int)$mod['id'],
+                                'price_added'   => (float)($mod['price'] ?? 0),
+                            ]);
+                        }
+                    }
+                }
+
+                // 3. INSERT payment (cash = langsung success)
+                Payment::create([
+                    'order_id'         => $order->order_id,
+                    'payment_method'   => 'Cash',
+                    'payment_gateway'  => null,
+                    'status'           => 'success',
+                    'amount'           => $request->total_final,
+                    'payment_response' => [
+                        'amount_tendered' => $request->amount_paid,
+                        'change'          => $request->amount_paid - $request->total_final,
+                    ],
+                    'paid_at'          => now(),
+                ]);
+
+                // 4. Bebaskan meja jika ada
+                if ($tableId) {
+                    DB::table('tables')
+                        ->where('table_id', $tableId)
+                        ->update(['status' => 'available']);
+                }
+            });
+
+            return response()->json([
+                'success'   => true,
+                'order_id'  => $createdOrderId,
+                'kembalian' => $request->amount_paid - $request->total_final,
+                'message'   => 'Transaksi berhasil disimpan.',
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyimpan transaksi: ' . $e->getMessage(),
+            ], 500);
         }
     }
 }

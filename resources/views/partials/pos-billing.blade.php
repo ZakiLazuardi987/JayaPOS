@@ -424,7 +424,6 @@
     {{-- Header Full Width --}}
     <div style="width: 100%; padding: 32px 48px; display: flex; justify-content: space-between; align-items: center;">
         <div style="color:var(--primary); font-weight:700; font-size:1.4rem;">TUNAI</div>
-        <button id="btnBatalTunai" style="background:transparent; border:1px solid var(--primary); color:var(--primary); padding:8px 24px; border-radius:4px; font-weight:600; cursor:pointer;">Batal</button>
     </div>
 
     {{-- Content Center --}}

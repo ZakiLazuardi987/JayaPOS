@@ -64,6 +64,9 @@ Route::middleware(['auth'])->group(function () {
 
         // AJAX: Update Meja Order Pending
         Route::patch('/orders/{id}/update-table', [POSController::class, 'updateOrderTable'])->name('updateOrderTable');
+
+        // AJAX: Checkout Cash
+        Route::post('/checkout/cash', [POSController::class, 'checkoutCash'])->name('checkoutCash');
     });
 });
 
