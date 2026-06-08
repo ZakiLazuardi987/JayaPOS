@@ -13,7 +13,7 @@
             <img src="{{ asset('assets/listbill_icon.png') }}" alt="Daftar Bill" style="width: 32px; height: 32px; object-fit: contain;">
             Daftar Bill
         </button>
-        <button class="btn-tambah-pelanggan">+ Tambah Pelanggan</button>
+        <button class="btn-tambah-pelanggan" id="btnTambahPelanggan">+ Tambah Pelanggan</button>
     </div>
 
     {{-- ORDER TYPE SELECTOR — klik untuk pilih tipe penjualan --}}
@@ -111,13 +111,52 @@
     </div>
 </div>
 
+{{-- MODAL: Search Member --}}
+<div class="modal-overlay" id="modalSearchMember" style="display:none;">
+    <div class="loyalty-modal">
+        {{-- Header --}}
+        <div class="loyalty-modal-header" style="justify-content: space-between;">
+            <button class="btn-loyalty-outline" id="btnBatalSearchMember">Batal</button>
+            <h3 class="loyalty-modal-title" style="flex: 1; text-align: center;"><span id="totalMembers">0</span> Pelanggan</h3>
+            <div style="width: 70px;"></div> {{-- Spacer --}}
+        </div>
+        <div class="loyalty-modal-divider"></div>
+
+        {{-- Body --}}
+        <div class="loyalty-modal-body" style="padding: 24px;">
+            <div style="position: relative; margin-bottom: 16px;">
+                <input type="text" id="inputSearchMember" class="loyalty-input" placeholder="Cari dari Nama, Nomor Telepon, atau Email" style="width: 100%; padding-right: 40px; border: 1px solid var(--primary); border-radius: 4px; outline: none;">
+                <img src="{{ asset('assets/search_icon.png') }}" alt="Search" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 24px; opacity: 0.5;">
+            </div>
+
+            <button class="btn-loyalty-check" style="width: 100%; margin-bottom: 24px; background: var(--primary); color: white; border: none; padding: 12px; border-radius: 4px; font-weight: 600; cursor: not-allowed; opacity: 0.8;" disabled>
+                Buat Pelanggan Baru (via CRM)
+            </button>
+
+            <div class="loyalty-label" style="font-size: 0.85rem; color: #6b7280; margin-bottom: 8px;">DAFTAR PELANGGAN</div>
+
+            {{-- Table header --}}
+            <div style="display: flex; background: #f3f4f6; padding: 12px; font-weight: 600; font-size: 0.9rem; color: #374151;">
+                <div style="flex: 1;">Nama</div>
+                <div style="flex: 1;">Nomor Telepon</div>
+                <div style="flex: 1;">Email</div>
+            </div>
+
+            {{-- Member List --}}
+            <div id="searchMemberList" style="max-height: 300px; overflow-y: auto;">
+                <div style="padding: 24px; text-align: center; color: #6b7280;">Memuat data...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- MODAL: Loyalty Program / Cek Member --}}
 <div class="modal-overlay" id="modalLoyalty" style="display:none;">
     <div class="loyalty-modal">
         {{-- Header --}}
         <div class="loyalty-modal-header">
             <button class="btn-loyalty-outline" id="btnBatalLoyalty">Batal</button>
-            <h3 class="loyalty-modal-title">Pisah Bill</h3>
+            <h3 class="loyalty-modal-title">Program Loyalty</h3>
             <button class="btn-loyalty-outline" id="btnLewatiLoyalty">Lewati</button>
         </div>
         <div class="loyalty-modal-divider"></div>
@@ -129,7 +168,7 @@
                     <img src="{{ asset('assets/trophy.png') }}" alt="Trophy">
                 </div>
             </div>
-            <p class="loyalty-subtitle">Dapatkan 10 poin untuk registrasi Member Baru</p>
+            <p class="loyalty-subtitle" id="loyaltySubtitleText">Dapatkan poin dari pesanan ini</p>
 
             <div class="loyalty-section">
                 <div class="loyalty-label">DAFTAR ATAU CARI MEMBER</div>
@@ -141,9 +180,10 @@
                     <input type="text" id="loyaltyPhone" class="loyalty-input" placeholder="812">
                     <button class="btn-loyalty-check" id="btnCheckMember">Check</button>
                 </div>
+                <div id="loyaltyCheckResult" style="font-size: 0.85rem; margin-top: 8px; text-align: left;"></div>
             </div>
 
-            <div class="loyalty-section">
+            <!-- <div class="loyalty-section">
                 <div class="loyalty-label-row">
                     <div class="loyalty-label">DAFTAR REWARD</div>
                     <div class="loyalty-toggle">Sembunyikan</div>
@@ -172,7 +212,7 @@
                         <div class="reward-points">10</div>
                     </div>
                 </div>
-            </div>
+            </div> -->
         </div>
     </div>
 </div>
@@ -216,7 +256,9 @@
         {{-- Body —— rows rendered by JS --}}
         <div class="loyalty-modal-body" id="daftarBillBody" style="padding: 0; overflow-y: auto; flex: 1;">
             <div class="daftar-bill-loading" id="daftarBillLoading" style="display:flex; align-items:center; justify-content:center; padding: 48px 0; color:#9ca3af; font-size:0.95rem;">
-                <svg style="margin-right:10px; animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                <svg style="margin-right:10px; animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
                 Memuat data...
             </div>
             <table class="daftar-bill-table" id="daftarBillTable" style="display:none; width:100%; border-collapse:collapse;">
@@ -270,7 +312,7 @@
         {{-- Header --}}
         <div class="loyalty-modal-header">
             <button class="btn-staff-back" id="btnBackToLoyalty">
-                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" style="stroke: var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="19" y1="12" x2="5" y2="12"></line>
                     <polyline points="12 19 5 12 12 5"></polyline>
                 </svg>
@@ -286,7 +328,7 @@
             @foreach($staffs as $staff)
             <div class="staff-list-item" data-id="{{ $staff->staff_id }}" data-name="{{ $staff->name }}">
                 <div class="staff-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" style="stroke: var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                         <circle cx="12" cy="7" r="4"></circle>
                     </svg>
@@ -316,7 +358,7 @@
 
             {{-- Server Info --}}
             <div class="payment-section" style="padding: 16px 0; border-bottom: 1px solid #e5e7eb;">
-                <span style="color: #111; font-weight: 500; font-size: 0.9rem;">Server</span> 
+                <span style="color: #111; font-weight: 500; font-size: 0.9rem;">Server</span>
                 <span style="color: #9ca3af; font-size: 0.9rem;" id="paymentServerName">| -</span>
             </div>
 
@@ -423,17 +465,17 @@
 <div class="modal-full-overlay" id="modalTunaiSuccess" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#fff; z-index:9999; flex-direction:column;">
     {{-- Header Full Width --}}
     <div style="width: 100%; padding: 32px 48px; display: flex; justify-content: space-between; align-items: center;">
-        <div style="color:var(--primary); font-weight:700; font-size:1.4rem;">TUNAI</div>
+        <div style="color:var(--primary); font-weight:700; font-size:1.4rem;" id="tunaiSuccessTitle">TUNAI</div>
     </div>
 
     {{-- Content Center --}}
     <div style="width:100%; max-width:500px; margin: 0 auto; display:flex; flex-direction:column; align-items:center;">
-        <div style="font-size:1.2rem; color:#333;">Bayar <span id="tunaiSuccessBayar">Rp 0</span></div>
-        <div style="margin-top:24px; font-size:2rem; font-weight:600; color:var(--primary);">Kembalian</div>
+        <div style="font-size:1.2rem; color:#333;" id="tunaiSuccessBayarContainer">Bayar <span id="tunaiSuccessBayar">Rp 0</span></div>
+        <div style="margin-top:24px; font-size:2rem; font-weight:600; color:var(--primary);" id="tunaiSuccessKembalianLabel">Kembalian</div>
         <div style="margin-top:8px; font-size:2rem; font-weight:600; color:var(--primary);" id="tunaiSuccessKembalian">Rp 0</div>
-        
+
         <img src="{{ asset('assets/payment_check.png') }}" alt="Check" style="width:120px; margin-top:32px;">
-        
+
         <div style="width:100%; margin-top:32px;">
             <div style="display:flex; margin-bottom:16px;">
                 <input type="email" placeholder="Struk Email" style="flex:1; padding:12px; border:1px solid #9ca3af; border-radius:4px 0 0 4px; outline:none; font-family:inherit; font-size:1rem;">
@@ -444,8 +486,8 @@
                 <button style="background:var(--primary); color:white; border:none; padding:0 24px; border-radius:0 4px 4px 0; font-weight:600; cursor:pointer;">Kirim</button>
             </div>
         </div>
-        
-        <button style="width:100%; background:var(--primary); color:white; border:none; padding:14px; border-radius:4px; font-weight:600; font-size:1.05rem; cursor:pointer; margin-bottom:16px;">Cetak Struk</button>
+
+        <button id="btnCetakStrukSuccess" style="width:100%; background:var(--primary); color:white; border:none; padding:14px; border-radius:4px; font-weight:600; font-size:1.05rem; cursor:pointer; margin-bottom:16px;">Cetak Struk</button>
         <button id="btnTransaksiBaru" style="width:100%; background:transparent; color:var(--primary); border:1px solid var(--primary); padding:14px; border-radius:4px; font-weight:600; font-size:1.05rem; cursor:pointer;">Transaksi Baru</button>
     </div>
 </div>
@@ -464,26 +506,26 @@
     <div style="width:100%; max-width:500px; margin: 0 auto; display:flex; flex-direction:column; align-items:center;">
         <div style="margin-top:24px; font-size:1.2rem; color:#333;">Total Harga</div>
         <div style="margin-top:8px; font-size:2rem; font-weight:600; color:var(--primary);" id="qrisTotalHargaDisplay">Rp 0</div>
-        
+
         <div style="margin-top:32px; padding:16px; border:1px solid #e5e7eb; border-radius:8px;">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=JayaPOS" alt="QR Code" style="width:200px; height:200px;">
+            <img id="qrisMainImage" src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=JayaPOS" alt="QR Code" style="width:200px; height:200px;">
         </div>
-        
+
         <button style="width:100%; max-width:300px; background:transparent; color:var(--primary); border:1px solid var(--primary); padding:12px; border-radius:4px; font-weight:600; cursor:pointer; margin-top:32px;">Cetak QR Code</button>
-        
+
         <div style="text-align:center; margin-top:32px;">
             <div style="font-weight:700; color:#111; margin-bottom:4px;">Toko Kopi Jaya Tenes</div>
             <div style="color:#111;">Jl. Tenes</div>
         </div>
-        
+
         <div style="margin-top:32px; position:relative; width:80px; height:80px; display:flex; justify-content:center; align-items:center;">
             <svg width="80" height="80" style="position:absolute; transform:rotate(-90deg);">
                 <circle cx="40" cy="40" r="36" fill="none" stroke="#e5e7eb" stroke-width="8"></circle>
-                <circle cx="40" cy="40" r="36" fill="none" stroke="var(--primary)" stroke-width="8" stroke-dasharray="226" stroke-dashoffset="0" id="qrisProgressCircle" style="transition: stroke-dashoffset 1s linear;"></circle>
+                <circle cx="40" cy="40" r="36" fill="none" stroke-width="8" stroke-dasharray="226" stroke-dashoffset="0" id="qrisProgressCircle" style="stroke: var(--primary); transition: stroke-dashoffset 1s linear;"></circle>
             </svg>
             <div id="qrisCountdownText" style="font-size:1.2rem; font-weight:600; color:#111;">60</div>
         </div>
-        
+
         <div style="margin-top:24px; font-size:0.85rem; color:#9ca3af;">Transaksi e-wallet tidak bisa di refund</div>
     </div>
 </div>
@@ -512,29 +554,29 @@
     {{-- Main Area Container --}}
     <div id="pilihMejaContent" style="flex:1; overflow-y:auto; padding:40px 32px; display:flex; justify-content:center; align-items:center;">
         @if(isset($areas) && count($areas) > 0)
-            @foreach($areas as $areaIdx => $area)
-                <div class="area-grid-view" id="areaGridView_{{ $area->area_id }}" style="display: {{ $areaIdx === 0 ? 'grid' : 'none' }}; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 24px; width: 100%; max-width: 900px; justify-content: center; align-content: center;">
-                    @foreach($area->tables as $table)
-                        @if($table->status === 'occupied')
-                            {{-- Occupied Table --}}
-                            <div class="table-card table-occupied" style="background:#d1d5db; border-radius:50%; width:110px; height:110px; margin:0 auto; display:flex; flex-direction:column; justify-content:center; align-items:center; cursor:not-allowed; box-shadow:0 4px 6px rgba(0,0,0,0.05); color:#6b7280;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="margin-bottom:4px;">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                                </svg>
-                                <span style="font-size:0.75rem; font-weight:600; opacity:0.8;">Terisi</span>
-                            </div>
-                        @else
-                            {{-- Available Table --}}
-                            <div class="table-card table-available" data-id="{{ $table->table_id }}" data-name="{{ $table->name }}" data-capacity="{{ $table->capacity }}" data-area="{{ $area->name }}" style="background:#fff; border-radius:12px; height:100px; display:flex; flex-direction:column; justify-content:center; align-items:center; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.05); transition:all 0.2s; border: 2px solid transparent;" onmouseover="this.style.transform='scale(1.03)';" onmouseout="this.style.transform='scale(1)';">
-                                <span style="font-weight:700; color:#374151; font-size:1rem;">{{ $table->name }}</span>
-                                <span style="font-size:0.8rem; color:#9ca3af; margin-top:4px;">0 / {{ $table->capacity }}</span>
-                            </div>
-                        @endif
-                    @endforeach
-                </div>
+        @foreach($areas as $areaIdx => $area)
+        <div class="area-grid-view" id="areaGridView_{{ $area->area_id }}" style="display: {{ $areaIdx === 0 ? 'grid' : 'none' }}; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 24px; width: 100%; max-width: 900px; justify-content: center; align-content: center;">
+            @foreach($area->tables as $table)
+            @if($table->status === 'occupied')
+            {{-- Occupied Table --}}
+            <div class="table-card table-occupied" style="background:#d1d5db; border-radius:50%; width:110px; height:110px; margin:0 auto; display:flex; flex-direction:column; justify-content:center; align-items:center; cursor:not-allowed; box-shadow:0 4px 6px rgba(0,0,0,0.05); color:#6b7280;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="margin-bottom:4px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+                <span style="font-size:0.75rem; font-weight:600; opacity:0.8;">Terisi</span>
+            </div>
+            @else
+            {{-- Available Table --}}
+            <div class="table-card table-available" data-id="{{ $table->table_id }}" data-name="{{ $table->name }}" data-capacity="{{ $table->capacity }}" data-area="{{ $area->name }}" style="background:#fff; border-radius:12px; height:100px; display:flex; flex-direction:column; justify-content:center; align-items:center; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.05); transition:all 0.2s; border: 2px solid transparent;" onmouseover="this.style.transform='scale(1.03)';" onmouseout="this.style.transform='scale(1)';">
+                <span style="font-weight:700; color:#374151; font-size:1rem;">{{ $table->name }}</span>
+                <span style="font-size:0.8rem; color:#9ca3af; margin-top:4px;">0 / {{ $table->capacity }}</span>
+            </div>
+            @endif
             @endforeach
+        </div>
+        @endforeach
         @else
-            <div style="color:#6b7280; font-size:1.1rem;">Belum ada denah meja yang di-setup.</div>
+        <div style="color:#6b7280; font-size:1.1rem;">Belum ada denah meja yang di-setup.</div>
         @endif
     </div>
 
@@ -570,24 +612,24 @@
                 <label style="display:block; font-size:0.8rem; font-weight:700; color:#111827; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:12px;">PILIH PELAYAN</label>
                 <div id="waiterSelectionList" class="staff-modal-body" style="flex:1; gap:0; overflow-y:auto; border-top: 1px solid #e5e7eb;">
                     @if(isset($staffs) && count($staffs) > 0)
-                        @foreach($staffs as $staff)
-                            <div class="staff-list-item waiter-item" data-id="{{ $staff->staff_id }}" data-name="{{ $staff->name }}" style="display:flex; align-items:center; justify-content:space-between; padding:16px 32px; border-bottom:1px solid #e5e7eb; cursor:pointer;">
-                                <div style="display:flex; align-items:center;">
-                                    <div class="staff-icon" style="margin-right:16px;">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                            <circle cx="12" cy="7" r="4"></circle>
-                                        </svg>
-                                    </div>
-                                    <div class="staff-name">{{ $staff->name }}</div>
-                                </div>
-                                <div style="font-size:1.05rem; color:#4b5563; font-weight:400;">
-                                    {{ ucfirst($staff->role === 'cashier' ? 'Kasir' : $staff->role) }}
-                                </div>
+                    @foreach($staffs as $staff)
+                    <div class="staff-list-item waiter-item" data-id="{{ $staff->staff_id }}" data-name="{{ $staff->name }}" style="display:flex; align-items:center; justify-content:space-between; padding:16px 32px; border-bottom:1px solid #e5e7eb; cursor:pointer;">
+                        <div style="display:flex; align-items:center;">
+                            <div class="staff-icon" style="margin-right:16px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
                             </div>
-                        @endforeach
+                            <div class="staff-name">{{ $staff->name }}</div>
+                        </div>
+                        <div style="font-size:1.05rem; color:#4b5563; font-weight:400;">
+                            {{ ucfirst($staff->role === 'cashier' ? 'Kasir' : $staff->role) }}
+                        </div>
+                    </div>
+                    @endforeach
                     @else
-                        <div style="text-align:center; color:#9ca3af; padding:32px 0;">Belum ada pelayan aktif.</div>
+                    <div style="text-align:center; color:#9ca3af; padding:32px 0;">Belum ada pelayan aktif.</div>
                     @endif
                 </div>
             </div>

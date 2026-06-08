@@ -32,6 +32,7 @@
                          data-product-id="{{ $product->product_id }}"
                          data-product-name="{{ $product->name }}"
                          data-product-price="{{ $product->base_price }}"
+                         data-earning-points="{{ $product->earning_points ?? 0 }}"
                          data-product-img="{{ $product->img_url ? asset($product->img_url) : asset('images/default.jpg') }}">
                         <img src="{{ $product->img_url ? asset($product->img_url) : asset('images/default.jpg') }}" class="item-img" alt="" draggable="false">
                         <div class="list-item-name">{{ $product->name }}</div>

@@ -85,6 +85,7 @@ class POSController extends Controller
             'name'       => $product->name,
             'price'      => (float) $product->base_price,
             'img_url'    => $product->img_url,
+            'earning_points' => (int) $product->earning_points,
             'groups'     => $groups,
         ]);
     }
@@ -429,9 +430,23 @@ class POSController extends Controller
                     ? (\App\Models\Table::find($tableId)->name ?? '')
                     : ($request->table_number ?? '');
 
+                // Calculate earning points from DB securely
+                $pointsEarned = 0;
+                foreach ($request->cart as $item) {
+                    $productId = $item['product_id'];
+                    $isCustom  = str_starts_with((string)$productId, 'custom_');
+                    if (!$isCustom) {
+                        $product = \App\Models\Product::find($productId);
+                        if ($product) {
+                            $pointsEarned += ($product->earning_points * (int)$item['qty']);
+                        }
+                    }
+                }
+
                 $order = Order::create([
                     'staff_id'          => $staffId,
                     'outlet_id'         => $outletId,
+                    'member_id'         => $request->customer_id ?: null,
                     'source'            => 'POS - In-Store',
                     'order_type'        => $request->order_type,
                     'table_id'          => $tableId,
@@ -445,7 +460,7 @@ class POSController extends Controller
                     'discount_id'       => $request->discount_id ?: null,
                     'discount_amount'   => $request->discount_amount ?? 0,
                     'total_final'       => $request->total_final,
-                    'points_earned'     => 0,
+                    'points_earned'     => $pointsEarned,
                     'created_at'        => now(),
                 ]);
 
@@ -497,7 +512,17 @@ class POSController extends Controller
                     'paid_at'          => now(),
                 ]);
 
-                // 4. Bebaskan meja jika ada
+                // 4. Update points member
+                if ($order->member_id && $order->points_earned > 0) {
+                    $member = \App\Models\Member::find($order->member_id);
+                    if ($member) {
+                        $member->current_points += $order->points_earned;
+                        $member->lifetime_points_earned += $order->points_earned;
+                        $member->save();
+                    }
+                }
+
+                // 5. Bebaskan meja jika ada
                 if ($tableId) {
                     DB::table('tables')
                         ->where('table_id', $tableId)
@@ -518,5 +543,336 @@ class POSController extends Controller
                 'message' => 'Gagal menyimpan transaksi: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    // ==========================================
+    // AJAX: Checkout QRIS
+    // ==========================================
+    public function checkoutQris(Request $request)
+    {
+        $request->validate([
+            'cart'        => 'required|array|min:1',
+            'subtotal'    => 'required|numeric|min:0',
+            'total_final' => 'required|numeric|min:0',
+            'order_type'  => 'required|string',
+        ]);
+
+        $outletId = session('active_outlet');
+        $staffId  = auth()->user()->staff_id;
+        $createdOrderId = null;
+        $qrCodeUrl = null;
+
+        try {
+            DB::transaction(function () use ($request, $outletId, $staffId, &$createdOrderId, &$qrCodeUrl) {
+
+                // 1. INSERT orders (status pending)
+                $tableId   = $request->table_id ?: null;
+                $tableName = $tableId
+                    ? (\App\Models\Table::find($tableId)->name ?? '')
+                    : ($request->table_number ?? '');
+
+                // Calculate earning points from DB securely
+                $pointsEarned = 0;
+                foreach ($request->cart as $item) {
+                    $productId = $item['product_id'];
+                    $isCustom  = str_starts_with((string)$productId, 'custom_');
+                    if (!$isCustom) {
+                        $product = \App\Models\Product::find($productId);
+                        if ($product) {
+                            $pointsEarned += ($product->earning_points * (int)$item['qty']);
+                        }
+                    }
+                }
+
+                $order = Order::create([
+                    'staff_id'          => $staffId,
+                    'outlet_id'         => $outletId,
+                    'member_id'         => $request->customer_id ?: null,
+                    'source'            => 'POS - In-Store',
+                    'order_type'        => $request->order_type,
+                    'table_id'          => $tableId,
+                    'table_number'      => $tableName,
+                    'pax'               => $request->pax ?? 1,
+                    'waiter_id'         => $request->waiter_id ?: null,
+                    'status'            => 'pending',
+                    'subtotal'          => $request->subtotal,
+                    'tax_id'            => $request->tax_id ?: null,
+                    'service_charge_id' => $request->service_charge_id ?: null,
+                    'discount_id'       => $request->discount_id ?: null,
+                    'discount_amount'   => $request->discount_amount ?? 0,
+                    'total_final'       => $request->total_final,
+                    'points_earned'     => $pointsEarned,
+                    'created_at'        => now(),
+                ]);
+
+                $createdOrderId = $order->order_id;
+
+                // 2. INSERT order_items + modifiers
+                foreach ($request->cart as $item) {
+                    $productId   = $item['product_id'];
+                    $isCustom    = str_starts_with((string)$productId, 'custom_');
+                    $dbProductId = $isCustom ? 999 : (int)$productId;
+
+                    $orderItem = OrderItem::create([
+                        'order_id'          => $order->order_id,
+                        'product_id'        => $dbProductId,
+                        'quantity'          => $isCustom ? 1 : (int)$item['qty'],
+                        'price_at_purchase' => $isCustom
+                            ? (float)$item['total_price']
+                            : (float)$item['unit_price'],
+                        'created_at'        => now(),
+                    ]);
+
+                    if (!empty($item['modifiers']) && is_array($item['modifiers'])) {
+                        foreach ($item['modifiers'] as $mod) {
+                            DB::table('order_item_modifier')->insert([
+                                'order_item_id' => $orderItem->order_item_id,
+                                'modifier_id'   => (int)$mod['id'],
+                                'price_added'   => (float)($mod['price'] ?? 0),
+                            ]);
+                        }
+                    }
+                }
+
+                // 3. Request QRIS ke Midtrans Core API
+                $serverKey = config('services.midtrans.server_key');
+                $isProduction = config('services.midtrans.is_production', false);
+                $baseUrl = $isProduction 
+                    ? 'https://api.midtrans.com/v2/charge' 
+                    : 'https://api.sandbox.midtrans.com/v2/charge';
+
+                $payload = [
+                    'payment_type' => 'qris',
+                    'transaction_details' => [
+                        'order_id'     => 'ORDER-' . $order->order_id . '-' . time(),
+                        'gross_amount' => (int) $request->total_final,
+                    ],
+                    'custom_field1' => (string) $order->order_id, // Simpan real order_id di custom_field
+                ];
+
+                $response = \Illuminate\Support\Facades\Http::withBasicAuth($serverKey, '')
+                    ->post($baseUrl, $payload);
+
+                $midtransData = $response->json();
+
+                if ($response->failed() || !isset($midtransData['status_code']) || $midtransData['status_code'] != '201') {
+                    throw new \Exception('Gagal generate QRIS Midtrans: ' . ($midtransData['status_message'] ?? 'Unknown Error'));
+                }
+
+                $actions = $midtransData['actions'] ?? [];
+                foreach ($actions as $action) {
+                    if ($action['name'] === 'generate-qr-code') {
+                        $qrCodeUrl = $action['url'];
+                        break;
+                    }
+                }
+
+                if (!$qrCodeUrl) {
+                    throw new \Exception('URL QR Code tidak ditemukan di response Midtrans.');
+                }
+
+                // 4. INSERT payment (status pending)
+                Payment::create([
+                    'order_id'        => $order->order_id,
+                    'payment_method'  => 'QRIS',
+                    'payment_gateway' => 'midtrans',
+                    'transaction_id'  => $midtransData['transaction_id'] ?? null,
+                    'payment_url'     => $qrCodeUrl,
+                    'payment_response'=> $midtransData,
+                    'status'          => 'pending',
+                    'amount'          => $request->total_final,
+                    'created_at'      => now(),
+                ]);
+
+                // Meja tetap occupied (tidak dibebaskan sampai lunas)
+            });
+
+            return response()->json([
+                'success'     => true,
+                'order_id'    => $createdOrderId,
+                'qr_code_url' => $qrCodeUrl,
+                'message'     => 'QRIS berhasil dibuat.',
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal membuat QRIS: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // ==========================================
+    // AJAX: Cek Status QRIS (Polling)
+    // ==========================================
+    public function checkQrisStatus($orderId)
+    {
+        $payment = Payment::where('order_id', $orderId)
+                          ->where('payment_gateway', 'midtrans')
+                          ->first();
+
+        if (!$payment) {
+            return response()->json(['status' => 'not_found']);
+        }
+
+        if ($payment->status === 'success') {
+            return response()->json(['status' => 'success']);
+        }
+
+        if ($payment->status === 'failed' || $payment->status === 'expired') {
+            return response()->json(['status' => 'failed']);
+        }
+
+        // Jika masih pending, tembak API Midtrans untuk cek status asli
+        // (Sangat berguna untuk testing di localhost karena Webhook tidak jalan)
+        $serverKey = config('services.midtrans.server_key');
+        $isProduction = config('services.midtrans.is_production', false);
+        $baseUrl = $isProduction 
+            ? 'https://api.midtrans.com/v2/' 
+            : 'https://api.sandbox.midtrans.com/v2/';
+
+        if ($payment->transaction_id) {
+            try {
+                $response = \Illuminate\Support\Facades\Http::withBasicAuth($serverKey, '')
+                    ->get($baseUrl . $payment->transaction_id . '/status');
+                
+                if ($response->successful()) {
+                    $midtransStatus = $response->json();
+                    $transactionStatus = $midtransStatus['transaction_status'] ?? '';
+
+                    if ($transactionStatus == 'capture' || $transactionStatus == 'settlement') {
+                        DB::transaction(function() use ($payment, $midtransStatus, $orderId) {
+                            $payment->status = 'success';
+                            $payment->paid_at = now();
+                            $payment->payment_response = array_merge((array)$payment->payment_response, (array)$midtransStatus);
+                            $payment->save();
+
+                            $order = Order::find($orderId);
+                            if ($order) {
+                                $order->status = 'paid';
+                                $order->save();
+                                DB::table('orders')->where('order_id', $order->order_id)->update(['paid_at' => now()]);
+                                
+                                if ($order->member_id && $order->points_earned > 0) {
+                                    $member = \App\Models\Member::find($order->member_id);
+                                    if ($member) {
+                                        $member->current_points += $order->points_earned;
+                                        $member->lifetime_points_earned += $order->points_earned;
+                                        $member->save();
+                                    }
+                                }
+
+                                if ($order->table_id) {
+                                    DB::table('tables')->where('table_id', $order->table_id)->update(['status' => 'available']);
+                                }
+                            }
+                        });
+                        return response()->json(['status' => 'success']);
+                    } else if ($transactionStatus == 'cancel' || $transactionStatus == 'deny' || $transactionStatus == 'expire') {
+                        DB::transaction(function() use ($payment, $midtransStatus, $orderId) {
+                            $payment->status = $transactionStatus == 'expire' ? 'expired' : 'failed';
+                            $payment->expired_at = now();
+                            $payment->payment_response = array_merge((array)$payment->payment_response, (array)$midtransStatus);
+                            $payment->save();
+
+                            $order = Order::find($orderId);
+                            if ($order) {
+                                $order->status = 'cancelled';
+                                $order->save();
+                                if ($order->table_id) {
+                                    DB::table('tables')->where('table_id', $order->table_id)->update(['status' => 'available']);
+                                }
+                            }
+                        });
+                        return response()->json(['status' => 'failed']);
+                    }
+                }
+            } catch (\Exception $e) {
+                // Ignore error, kita coba lagi di interval polling berikutnya
+            }
+        }
+
+        return response()->json(['status' => 'pending']);
+    }
+
+    public function checkCustomer(Request $request)
+    {
+        $phone = $request->query('phone');
+        if (!$phone) {
+            return response()->json(['status' => 'error', 'message' => 'Phone number required'], 400);
+        }
+
+        // Cari berdasarkan phone_number di tabel member
+        // Misal kolom phone number bisa bervariasi +62 atau 08
+        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+        
+        // Strip leading 0 or 62
+        if (str_starts_with($cleanPhone, '62')) {
+            $basePhone = substr($cleanPhone, 2);
+        } elseif (str_starts_with($cleanPhone, '0')) {
+            $basePhone = substr($cleanPhone, 1);
+        } else {
+            $basePhone = $cleanPhone;
+        }
+
+        $possiblePhones = [
+            $basePhone,
+            '0' . $basePhone,
+            '62' . $basePhone,
+            '+62' . $basePhone
+        ];
+        
+        $member = \App\Models\Member::whereIn('phone_number', $possiblePhones)
+            ->where('is_active', 1)
+            ->first();
+
+        if ($member) {
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'id' => $member->member_id,
+                    'name' => $member->name,
+                    'phone' => $member->phone_number,
+                    'points' => $member->current_points
+                ]
+            ]);
+        }
+
+        return response()->json(['status' => 'not_found'], 404);
+    }
+
+    // ==========================================
+    // AJAX: Search Members
+    // ==========================================
+    public function searchMembers(Request $request)
+    {
+        $query = $request->query('q', '');
+        
+        $membersQuery = \App\Models\Member::where('is_active', 1);
+
+        if ($query) {
+            $membersQuery->where(function($q) use ($query) {
+                $q->where('name', 'LIKE', '%' . $query . '%')
+                  ->orWhere('phone_number', 'LIKE', '%' . $query . '%')
+                  ->orWhere('email', 'LIKE', '%' . $query . '%');
+            });
+        }
+
+        $totalMembers = \App\Models\Member::where('is_active', 1)->count();
+        $members = $membersQuery->orderBy('created_at', 'desc')->limit(20)->get();
+
+        return response()->json([
+            'status' => 'success',
+            'total' => $totalMembers,
+            'data' => $members->map(function($m) {
+                return [
+                    'id' => $m->member_id,
+                    'name' => $m->name,
+                    'phone' => $m->phone_number,
+                    'email' => $m->email,
+                    'points' => $m->current_points
+                ];
+            })
+        ]);
     }
 }

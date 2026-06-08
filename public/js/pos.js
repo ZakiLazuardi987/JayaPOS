@@ -531,6 +531,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (result.isConfirmed) {
                         cart = [];
                         saveCart();
+                        localStorage.removeItem('active_table');
+                        localStorage.removeItem('active_order_id');
+                        localStorage.removeItem('pos_customer');
+                        window.activeCustomer = null;
+                        renderCustomerInfo();
                         renderCart();
                         Swal.fire({
                             title: 'Berhasil!',
@@ -546,6 +551,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (confirm('Kosongkan seluruh keranjang belanja?')) {
                     cart = [];
                     saveCart();
+                    localStorage.removeItem('active_table');
+                    localStorage.removeItem('active_order_id');
+                    localStorage.removeItem('pos_customer');
+                    window.activeCustomer = null;
+                    renderCustomerInfo();
                     renderCart();
                 }
             }
@@ -835,12 +845,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         qty:         qty,
                         unit_price:  unitPrice,
                         total_price: totalPrice,
+                        earning_points: currentProduct.earning_points || 0,
                     };
                 }
                 saveCart();
                 renderCart();
+                const productName = currentProduct.name;
                 closeDetailModal();
-                showToast(`${currentProduct.name} berhasil diupdate`);
+                showToast(`${productName} berhasil diupdate`);
             } else {
                 // ===== MODE TAMBAH: push item baru =====
                 const cartItem = {
@@ -849,6 +861,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     name:        currentProduct.name,
                     img_url:     currentProduct.img_url,
                     base_price:  currentProduct.price,
+                    earning_points: currentProduct.earning_points || 0,
                     modifiers:   selectedMods,
                     discounts:   selectedDiscounts,
                     order_type:  orderType,
@@ -859,8 +872,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 cart.push(cartItem);
                 saveCart();
                 renderCart();
+                const productName = currentProduct.name;
                 closeDetailModal();
-                showToast(`${currentProduct.name} ditambahkan ke keranjang`);
+                showToast(`${productName} ditambahkan ke keranjang`);
             }
         });
     }
@@ -872,35 +886,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalLoyalty = document.getElementById('modalLoyalty');
     const btnBatalLoyalty = document.getElementById('btnBatalLoyalty');
     const btnLewatiLoyalty = document.getElementById('btnLewatiLoyalty');
-    
-    if (btnBayar && modalLoyalty) {
-        btnBayar.addEventListener('click', () => {
-            if (cart.length === 0) {
-                showToast('Keranjang masih kosong', true);
-                return;
-            }
-            modalLoyalty.style.display = 'flex';
-        });
-    }
 
-    if (btnBatalLoyalty && modalLoyalty) {
-        btnBatalLoyalty.addEventListener('click', () => {
-            modalLoyalty.style.display = 'none';
-        });
-    }
-
-    if (btnLewatiLoyalty && modalLoyalty) {
-        btnLewatiLoyalty.addEventListener('click', () => {
-            modalLoyalty.style.display = 'none';
-            // Tampilkan modal pilih pelayan
-            const modalStaff = document.getElementById('modalStaff');
-            if (modalStaff) {
-                modalStaff.style.display = 'flex';
-            } else {
-                showToast('Lanjut ke Pembayaran...');
-            }
-        });
-    }
+    // (Listeners dipindah ke bagian 13B agar tidak bentrok)
 
     // =========================================================
     // 10. MODAL STAFF (PILIH PELAYAN) & PEMBAYARAN
@@ -1068,29 +1055,138 @@ document.addEventListener('DOMContentLoaded', () => {
             let isEwallet = activeBtn && activeBtn.dataset.method === 'ewallet';
             const activeTotal = window.splitBillActive ? window.splitBillSummaryData.grandTotal : currentGrandTotal;
 
-            if (isEwallet) {
-                modalPayment.style.display = 'none';
-                document.getElementById('qrisTotalHargaDisplay').innerText = `Rp ${activeTotal.toLocaleString('id-ID')}`;
-                modalQris.style.display = 'flex';
+            // --- Kumpulkan Data Payload ---
+            const activeTable = JSON.parse(localStorage.getItem('active_table') || 'null');
+            const activeOrderId = localStorage.getItem('active_order_id') || null;
+            const orderType = cart.length > 0 ? (cart[0].order_type || 'dine-in') : 'dine-in';
+            const taxId = (window.POS_CONFIG?.taxes?.[0]?.tax_id) || null;
+            let scConfig = window.POS_CONFIG?.serviceCharges?.find(c => {
+                let typeKeyword = orderType === 'dine-in' ? 'dine' : orderType;
+                return c.name.toLowerCase().includes(typeKeyword);
+            });
+            const serviceChargeId = scConfig ? scConfig.service_charge_id : null;
+            const discountId = null;
 
-                let secondsLeft = 60;
-                const textEl = document.getElementById('qrisCountdownText');
-                const circle = document.getElementById('qrisProgressCircle');
-                if (textEl && circle) {
-                    textEl.innerText = secondsLeft;
-                    circle.style.strokeDashoffset = '0';
-                    clearInterval(qrisInterval);
-                    qrisInterval = setInterval(() => {
-                        secondsLeft--;
-                        if (secondsLeft < 0) {
-                            clearInterval(qrisInterval);
-                            return;
-                        }
-                        textEl.innerText = secondsLeft;
-                        const offset = 226 - (secondsLeft / 60) * 226;
-                        circle.style.strokeDashoffset = offset;
-                    }, 1000);
+            let rawSubtotal = cart.reduce((s, i) => s + i.total_price, 0);
+            let totalDiscAmt = 0;
+            cart.forEach(i => {
+                if (i.discounts && i.discounts.length > 0) {
+                    i.discounts.forEach(d => {
+                        if (d.type === 'percentage') totalDiscAmt += i.total_price * (d.value / 100);
+                        else totalDiscAmt += parseFloat(d.value);
+                    });
                 }
+            });
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const basePayload = {
+                cart:               cart,
+                subtotal:           rawSubtotal,
+                discount_amount:    totalDiscAmt,
+                total_final:        activeTotal,
+                order_type:         orderType,
+                table_id:           activeTable?.id || null,
+                table_number:       activeTable?.name || '',
+                pax:                1,
+                waiter_id:          selectedStaffId,
+                tax_id:             taxId,
+                service_charge_id:  serviceChargeId,
+                discount_id:        discountId,
+                customer_id:        window.activeCustomer ? window.activeCustomer.id : null,
+            };
+
+            if (isEwallet) {
+                btnProsesPayment.disabled = true;
+                btnProsesPayment.innerText = 'Memproses QRIS...';
+
+                fetch('/pos/checkout/qris', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                    body: JSON.stringify(basePayload),
+                })
+                .then(r => r.json())
+                .then(resp => {
+                    btnProsesPayment.disabled = false;
+                    btnProsesPayment.innerText = 'Proses Pembayaran';
+
+                    if (!resp.success) {
+                        showToast(resp.message || 'Gagal membuat QRIS.', true);
+                        return;
+                    }
+
+                    window.lastOrderId = resp.order_id;
+                    
+                    // Ganti gambar QR dengan yang asli dari Midtrans
+                    const imgQr = document.getElementById('qrisMainImage');
+                    if (imgQr && resp.qr_code_url) {
+                        imgQr.src = resp.qr_code_url;
+                    }
+
+                    modalPayment.style.display = 'none';
+                    document.getElementById('qrisTotalHargaDisplay').innerText = `Rp ${activeTotal.toLocaleString('id-ID')}`;
+                    modalQris.style.display = 'flex';
+
+                    // Ubah jadi 300 detik (5 menit)
+                    let secondsLeft = 300;
+                    const textEl = document.getElementById('qrisCountdownText');
+                    const circle = document.getElementById('qrisProgressCircle');
+                    if (textEl && circle) {
+                        textEl.innerText = secondsLeft;
+                        circle.style.strokeDashoffset = '0';
+                        clearInterval(qrisInterval);
+                        qrisInterval = setInterval(() => {
+                            secondsLeft--;
+                            if (secondsLeft <= 0) {
+                                clearInterval(qrisInterval);
+                                modalQris.style.display = 'none';
+                                showToast('Waktu pembayaran QRIS habis. Silakan ulangi transaksi.', true);
+                                return;
+                            }
+                            textEl.innerText = secondsLeft;
+                            const offset = 226 - (secondsLeft / 300) * 226;
+                            circle.style.strokeDashoffset = offset;
+
+                            // Polling tiap 3 detik
+                            if (secondsLeft % 3 === 0) {
+                                fetch(`/pos/checkout/qris/${resp.order_id}/status`)
+                                    .then(r => r.json())
+                                    .then(res => {
+                                        if (res.status === 'success') {
+                                            clearInterval(qrisInterval);
+                                            modalQris.style.display = 'none';
+                                            
+                                            // Tampilkan modal sukses (sama seperti cash)
+                                            document.getElementById('tunaiSuccessTitle').innerText = 'QRIS / E-WALLET';
+                                            document.getElementById('tunaiSuccessBayarContainer').style.display = 'none';
+                                            document.getElementById('tunaiSuccessKembalianLabel').style.display = 'none';
+                                            
+                                            const lblKembalian = document.getElementById('tunaiSuccessKembalian');
+                                            lblKembalian.innerText = 'Pembayaran Berhasil';
+                                            lblKembalian.style.fontSize = '1.8rem';
+                                            
+                                            clearCartAfterPayment();
+
+                                            modalTunaiSuccess.style.display = 'flex';
+                                            showToast('Pembayaran QRIS Berhasil!', false);
+                                        } else if (res.status === 'failed') {
+                                            clearInterval(qrisInterval);
+                                            modalQris.style.display = 'none';
+                                            showToast('Pembayaran QRIS gagal atau dibatalkan.', true);
+                                        }
+                                    });
+                            }
+                        }, 1000);
+                    }
+                })
+                .catch(err => {
+                    btnProsesPayment.disabled = false;
+                    btnProsesPayment.innerText = 'Proses Pembayaran';
+                    showToast('Koneksi bermasalah. Coba lagi.', true);
+                    console.error(err);
+                });
+
             } else {
                 // ---- CASH PAYMENT ----
                 let bayar = tunaiValue;
@@ -1099,41 +1195,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Kumpulkan data aktif meja & order
-                const activeTable = JSON.parse(localStorage.getItem('active_table') || 'null');
-                const activeOrderId = localStorage.getItem('active_order_id') || null;
-
-                // Tentukan order_type dari item pertama di cart (fallback dine-in)
-                const orderType = cart.length > 0 ? (cart[0].order_type || 'dine-in') : 'dine-in';
-
-                // Kumpulkan tax_id, service_charge_id, discount_id dari POS_CONFIG (jika ada)
-                const taxId = (window.POS_CONFIG?.taxes?.[0]?.tax_id) || null;
-                
-                let scConfig = window.POS_CONFIG?.serviceCharges?.find(c => {
-                    let typeKeyword = orderType === 'dine-in' ? 'dine' : orderType;
-                    return c.name.toLowerCase().includes(typeKeyword);
-                });
-                const serviceChargeId = scConfig ? scConfig.service_charge_id : null;
-                
-                const discountId = null; // belum ada fitur select diskon global
-
-                // Hitung subtotal (sebelum tax/charge)
-                let rawSubtotal    = cart.reduce((s, i) => s + i.total_price, 0);
-                let totalDiscAmt   = 0;
-                cart.forEach(i => {
-                    if (i.discounts && i.discounts.length > 0) {
-                        i.discounts.forEach(d => {
-                            if (d.type === 'percentage') totalDiscAmt += i.total_price * (d.value / 100);
-                            else totalDiscAmt += parseFloat(d.value);
-                        });
-                    }
-                });
-
-                const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-                // Disable tombol agar tidak double-submit
                 btnProsesPayment.disabled = true;
                 btnProsesPayment.innerText = 'Memproses...';
+
+                const cashPayload = { ...basePayload, amount_paid: bayar };
 
                 fetch('/pos/checkout/cash', {
                     method: 'POST',
@@ -1141,21 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': csrf,
                     },
-                    body: JSON.stringify({
-                        cart:               cart,
-                        subtotal:           rawSubtotal,
-                        discount_amount:    totalDiscAmt,
-                        total_final:        activeTotal,
-                        amount_paid:        bayar,
-                        order_type:         orderType,
-                        table_id:           activeTable?.id || null,
-                        table_number:       activeTable?.name || '',
-                        pax:                1,
-                        waiter_id:          selectedStaffId,
-                        tax_id:             taxId,
-                        service_charge_id:  serviceChargeId,
-                        discount_id:        discountId,
-                    }),
+                    body: JSON.stringify(cashPayload),
                 })
                 .then(r => r.json())
                 .then(resp => {
@@ -1172,9 +1223,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Tampilkan modal sukses
                     modalPayment.style.display = 'none';
+
+                    // Pastikan elemen kembali seperti semula (karena bisa saja ter-hide oleh QRIS)
+                    document.getElementById('tunaiSuccessTitle').innerText = 'TUNAI';
+                    document.getElementById('tunaiSuccessBayarContainer').style.display = 'block';
+                    document.getElementById('tunaiSuccessKembalianLabel').style.display = 'block';
+                    const lblKembalianCash = document.getElementById('tunaiSuccessKembalian');
+                    lblKembalianCash.style.fontSize = '2.5rem';
+
                     document.getElementById('tunaiSuccessBayar').innerText = `Rp ${bayar.toLocaleString('id-ID')}`;
                     const kembalian = bayar - activeTotal;
-                    document.getElementById('tunaiSuccessKembalian').innerText = `Rp ${kembalian.toLocaleString('id-ID')}`;
+                    lblKembalianCash.innerText = `Rp ${kembalian.toLocaleString('id-ID')}`;
+                    
+                    clearCartAfterPayment();
+
                     modalTunaiSuccess.style.display = 'flex';
                 })
                 .catch(err => {
@@ -1210,34 +1272,39 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function clearCartAfterPayment() {
+        if (window.splitBillActive) {
+            cart = cart.map(item => {
+                const splitState = selectedSplitItems[item.id];
+                if (splitState && splitState.selected) {
+                    item.qty -= splitState.qty;
+                    item.total_price = item.qty * item.unit_price;
+                }
+                return item;
+            }).filter(item => item.qty > 0);
+            
+            saveCart();
+            window.splitBillActive = false;
+            
+            if (cart.length === 0) {
+                localStorage.removeItem('active_table');
+                localStorage.removeItem('active_order_id');
+                localStorage.removeItem('pos_customer');
+            }
+        } else {
+            cart = [];
+            saveCart();
+            localStorage.removeItem('active_table');
+            localStorage.removeItem('active_order_id');
+            localStorage.removeItem('pos_customer');
+        }
+    }
+
     if (btnTransaksiBaru) {
         btnTransaksiBaru.addEventListener('click', () => {
             if(modalTunaiSuccess) modalTunaiSuccess.style.display = 'none';
-            
-            if (window.splitBillActive) {
-                // Deduct selected split quantities from main cart!
-                cart = cart.map(item => {
-                    const splitState = selectedSplitItems[item.id];
-                    if (splitState && splitState.selected) {
-                        item.qty -= splitState.qty;
-                        item.total_price = item.qty * item.unit_price;
-                    }
-                    return item;
-                }).filter(item => item.qty > 0);
-                
-                saveCart();
-                window.splitBillActive = false;
-                
-                if (cart.length === 0) {
-                    localStorage.removeItem('active_table');
-                }
-                window.location.reload();
-            } else {
-                cart = [];
-                saveCart();
-                localStorage.removeItem('active_table');
-                window.location.reload();
-            }
+            localStorage.removeItem('pos_customer');
+            window.location.reload();
         });
     }
 
@@ -1847,6 +1914,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         saveCart();
                         localStorage.removeItem('active_table');
                         localStorage.removeItem('active_order_id');
+                        localStorage.removeItem('pos_customer');
                         if (typeof Swal !== 'undefined') {
                             Swal.fire({
                                 title: 'Berhasil!',
@@ -2116,8 +2184,275 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================
+    // 13B. PROGRAM LOYALTY & MEMBER
+    // =========================================================
+    const btnTambahPelanggan = document.getElementById('btnTambahPelanggan');
+    const modalSearchMember = document.getElementById('modalSearchMember');
+    const btnBatalSearchMember = document.getElementById('btnBatalSearchMember');
+    const inputSearchMember = document.getElementById('inputSearchMember');
+    const searchMemberList = document.getElementById('searchMemberList');
+    const totalMembersSpan = document.getElementById('totalMembers');
+
+    const btnCheckMember = document.getElementById('btnCheckMember');
+    const loyaltyPhone = document.getElementById('loyaltyPhone');
+    const loyaltySubtitleText = document.getElementById('loyaltySubtitleText');
+
+    let isCheckoutFlow = false;
+
+    window.activeCustomer = JSON.parse(localStorage.getItem('pos_customer')) || null;
+
+    if (btnBayar && modalLoyalty) {
+        btnBayar.addEventListener('click', () => {
+            if (cart.length === 0) {
+                showToast('Keranjang masih kosong', true);
+                return;
+            }
+            isCheckoutFlow = true;
+            
+            // Siapkan UI Modal Loyalty
+            const pts = cart.reduce((sum, item) => sum + ((item.earning_points || 0) * item.qty), 0);
+            if(loyaltySubtitleText) {
+                loyaltySubtitleText.innerText = pts > 0 
+                    ? `Dapatkan ${pts} poin dari pesanan ini`
+                    : `Kumpulkan poin dari setiap pesanan`;
+            }
+
+            const resultContainer = document.getElementById('loyaltyCheckResult');
+            if (resultContainer) resultContainer.innerHTML = '';
+
+            if(window.activeCustomer && window.activeCustomer.phone) {
+                loyaltyPhone.value = window.activeCustomer.phone.replace(/^(\+62|0)/, '');
+                btnLewatiLoyalty.innerText = 'Selanjutnya';
+                btnLewatiLoyalty.style.background = 'var(--primary)';
+                btnLewatiLoyalty.style.color = '#fff';
+                btnLewatiLoyalty.style.border = 'none';
+            } else {
+                loyaltyPhone.value = '';
+                btnLewatiLoyalty.innerText = 'Lewati';
+                btnLewatiLoyalty.style.background = '';
+                btnLewatiLoyalty.style.color = '';
+                btnLewatiLoyalty.style.border = '';
+            }
+
+            modalLoyalty.style.display = 'flex';
+        });
+    }
+
+    function renderCustomerInfo() {
+        if (!btnTambahPelanggan) return;
+        if (window.activeCustomer) {
+            btnTambahPelanggan.innerHTML = `
+                <div style="text-align:center; line-height: 1.2;">
+                    <div style="font-weight:600; font-size: 1.05rem;">${window.activeCustomer.name}</div>
+                    <div style="font-size:0.8rem; opacity: 0.8;">${window.activeCustomer.points || 0} Poin</div>
+                </div>
+            `;
+            btnTambahPelanggan.style.background = '';
+            btnTambahPelanggan.style.border = '';
+            btnTambahPelanggan.style.padding = '';
+            btnTambahPelanggan.style.borderRadius = '';
+        } else {
+            btnTambahPelanggan.innerHTML = '+ Tambah Pelanggan';
+            btnTambahPelanggan.style.background = '';
+            btnTambahPelanggan.style.border = '';
+            btnTambahPelanggan.style.padding = '';
+            btnTambahPelanggan.style.borderRadius = '';
+        }
+    }
+
+    let searchMemberDebounce;
+
+    function fetchMembers(query = '') {
+        if (!searchMemberList) return;
+        searchMemberList.innerHTML = '<div style="padding: 24px; text-align: center; color: #6b7280;">Memuat data...</div>';
+        
+        fetch(`/pos/customers/search?q=${encodeURIComponent(query)}`)
+            .then(r => r.json())
+            .then(res => {
+                if (res.status === 'success') {
+                    if (totalMembersSpan) totalMembersSpan.innerText = res.total;
+                    
+                    if (res.data.length === 0) {
+                        searchMemberList.innerHTML = '<div style="padding: 24px; text-align: center; color: #6b7280;">Pelanggan tidak ditemukan.</div>';
+                        return;
+                    }
+                    
+                    let html = '';
+                    res.data.forEach(m => {
+                        html += `
+                            <div class="member-item-row" style="display: flex; padding: 12px; border-bottom: 1px solid #e5e7eb; cursor: pointer; align-items: center;" onclick="selectMember(${m.id}, '${m.name}', '${m.phone || ''}', ${m.points || 0})">
+                                <div style="flex: 1; display: flex; align-items: center; gap: 12px;">
+                                    <div style="width: 24px; height: 24px; border-radius: 50%; background: #e5e7eb; display: flex; align-items: center; justify-content: center; color: #9ca3af;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3Zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg>
+                                    </div>
+                                    <span style="font-weight: 500; color: #111;">${m.name}</span>
+                                </div>
+                                <div style="flex: 1; color: #4b5563;">${m.phone || '-'}</div>
+                                <div style="flex: 1; color: #4b5563;">${m.email || '-'}</div>
+                            </div>
+                        `;
+                    });
+                    searchMemberList.innerHTML = html;
+                }
+            })
+            .catch(() => {
+                searchMemberList.innerHTML = '<div style="padding: 24px; text-align: center; color: #ef4444;">Gagal memuat data.</div>';
+            });
+    }
+
+    window.selectMember = function(id, name, phone, points) {
+        window.activeCustomer = { id, name, phone, points };
+        localStorage.setItem('pos_customer', JSON.stringify(window.activeCustomer));
+        renderCustomerInfo();
+        if (modalSearchMember) modalSearchMember.style.display = 'none';
+        showToast(`Pelanggan ${name} terpilih.`);
+    };
+
+    if (btnTambahPelanggan) {
+        btnTambahPelanggan.addEventListener('click', () => {
+            isCheckoutFlow = false;
+            if (!window.activeCustomer) {
+                // Open Search Member Modal
+                if (modalSearchMember) {
+                    if (inputSearchMember) inputSearchMember.value = '';
+                    fetchMembers();
+                    modalSearchMember.style.display = 'flex';
+                }
+            } else {
+                // Open Loyalty Modal (Karena sudah ada pelanggan terpilih)
+                let pts = 0;
+                cart.forEach(item => {
+                    pts += (item.earning_points || 0) * item.qty;
+                });
+                
+                if(loyaltySubtitleText) {
+                    loyaltySubtitleText.innerText = pts > 0 
+                        ? `Dapatkan ${pts} poin dari pesanan ini`
+                        : `Kumpulkan poin dari setiap pesanan`;
+                }
+                
+                const resultContainer = document.getElementById('loyaltyCheckResult');
+                if (resultContainer) resultContainer.innerHTML = '';
+                
+                if (loyaltyPhone) {
+                    loyaltyPhone.value = window.activeCustomer.phone ? window.activeCustomer.phone.replace(/^(\+62|0)/, '') : '';
+                }
+                
+                if (btnLewatiLoyalty) {
+                    btnLewatiLoyalty.innerText = 'Hapus Member';
+                    btnLewatiLoyalty.style.background = 'var(--primary)';
+                    btnLewatiLoyalty.style.color = '#fff';
+                    btnLewatiLoyalty.style.border = 'none';
+                }
+                
+                if (modalLoyalty) modalLoyalty.style.display = 'flex';
+            }
+        });
+    }
+
+    if (inputSearchMember) {
+        inputSearchMember.addEventListener('input', (e) => {
+            clearTimeout(searchMemberDebounce);
+            searchMemberDebounce = setTimeout(() => {
+                fetchMembers(e.target.value);
+            }, 300);
+        });
+    }
+
+    if (btnBatalSearchMember && modalSearchMember) {
+        btnBatalSearchMember.addEventListener('click', () => {
+            modalSearchMember.style.display = 'none';
+        });
+    }
+
+    const closeLoyaltyModal = () => {
+        if(modalLoyalty) modalLoyalty.style.display = 'none';
+    };
+
+    if (btnBatalLoyalty) btnBatalLoyalty.addEventListener('click', closeLoyaltyModal);
+    
+    if (btnLewatiLoyalty) {
+        btnLewatiLoyalty.addEventListener('click', () => {
+            if (btnLewatiLoyalty.innerText === 'Hapus Member') {
+                window.activeCustomer = null;
+                localStorage.removeItem('pos_customer');
+                renderCustomerInfo();
+                closeLoyaltyModal();
+                showToast('Member dihapus dari pesanan.');
+            } else if (btnLewatiLoyalty.innerText === 'Selanjutnya' || btnLewatiLoyalty.innerText === 'Lewati') {
+                if (btnLewatiLoyalty.innerText === 'Lewati') {
+                    window.activeCustomer = null;
+                    localStorage.removeItem('pos_customer');
+                    renderCustomerInfo();
+                }
+                closeLoyaltyModal();
+                
+                if (isCheckoutFlow) {
+                    const modalStaff = document.getElementById('modalStaff');
+                    if (modalStaff) {
+                        modalStaff.style.display = 'flex';
+                    } else {
+                        showToast('Lanjut ke Pembayaran...');
+                    }
+                }
+            } else {
+                window.activeCustomer = null;
+                localStorage.removeItem('pos_customer');
+                renderCustomerInfo();
+                closeLoyaltyModal();
+            }
+        });
+    }
+
+    if (btnCheckMember) {
+        btnCheckMember.addEventListener('click', () => {
+            const phone = loyaltyPhone.value.trim();
+            if(!phone) {
+                showToast('Masukkan nomor HP terlebih dahulu', true);
+                return;
+            }
+            
+            showLoading();
+            fetch(`/pos/customers/check?phone=${phone}`)
+                .then(r => r.json())
+                .then(res => {
+                    hideLoading();
+                    const resultContainer = document.getElementById('loyaltyCheckResult');
+                    if(res.status === 'success') {
+                        window.activeCustomer = res.data;
+                        localStorage.setItem('pos_customer', JSON.stringify(window.activeCustomer));
+                        renderCustomerInfo();
+                        
+                        if (resultContainer) {
+                            resultContainer.innerHTML = `<span style="color: #10b981;">Member ditemukan: <b>${res.data.name}</b></span>`;
+                        }
+                        
+                        if (btnLewatiLoyalty) {
+                            btnLewatiLoyalty.innerText = 'Selanjutnya';
+                            btnLewatiLoyalty.style.background = 'var(--primary)';
+                            btnLewatiLoyalty.style.color = '#fff';
+                            btnLewatiLoyalty.style.border = 'none';
+                        }
+                    } else {
+                        if (resultContainer) {
+                            resultContainer.innerHTML = `<span style="color: #ef4444;">Member tidak ditemukan. Daftarkan di Aplikasi CRM.</span>`;
+                        }
+                    }
+                })
+                .catch(() => {
+                    hideLoading();
+                    const resultContainer = document.getElementById('loyaltyCheckResult');
+                    if (resultContainer) {
+                        resultContainer.innerHTML = `<span style="color: #ef4444;">Gagal mengecek member. Terjadi kesalahan jaringan.</span>`;
+                    }
+                });
+        });
+    }
+
+    // =========================================================
     // 14. INIT
     // =========================================================
     renderCart();
+    renderCustomerInfo();
 
 }); // end DOMContentLoaded

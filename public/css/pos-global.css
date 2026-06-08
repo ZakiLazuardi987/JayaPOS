@@ -1149,7 +1149,7 @@ body {
     width: 48px;
     height: 48px;
     border-radius: 50%;
-    border: 2px solid #0284c7; /* Blue outline */
+    border: 2px solid var(--primary); 
     display: flex;
     align-items: center;
     justify-content: center;

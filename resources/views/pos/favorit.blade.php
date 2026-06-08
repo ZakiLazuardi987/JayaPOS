@@ -20,6 +20,7 @@
                                      data-product-id="{{ $products[$index]->product_id }}"
                                      data-product-name="{{ $products[$index]->name }}"
                                      data-product-price="{{ $products[$index]->base_price }}"
+                                     data-earning-points="{{ $products[$index]->earning_points ?? 0 }}"
                                      data-product-img="{{ $products[$index]->img_url ? asset($products[$index]->img_url) : asset('images/default.jpg') }}">
                                     <img src="{{ $products[$index]->img_url ? asset($products[$index]->img_url) : asset('images/default.jpg') }}" alt="">
                                     <div class="product-name">{{ $products[$index]->name }}</div>

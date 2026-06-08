@@ -13,6 +13,11 @@ Route::get('/', function () {
 })->name('home');
 
 // ==========================================
+// API ROUTES (No CSRF)
+// ==========================================
+Route::post('/api/midtrans/webhook', [\App\Http\Controllers\MidtransWebhookController::class, 'handle']);
+
+// ==========================================
 // GUEST ROUTES (Hanya untuk yang BELUM login)
 // ==========================================
 Route::middleware(['guest'])->group(function () {
@@ -67,6 +72,18 @@ Route::middleware(['auth'])->group(function () {
 
         // AJAX: Checkout Cash
         Route::post('/checkout/cash', [POSController::class, 'checkoutCash'])->name('checkoutCash');
+
+        // AJAX: Checkout QRIS
+        Route::post('/checkout/qris', [POSController::class, 'checkoutQris'])->name('checkoutQris');
+
+        // AJAX: Polling Status QRIS
+        Route::get('/checkout/qris/{orderId}/status', [POSController::class, 'checkQrisStatus']);
+
+        // AJAX: Cek Customer (Loyalty)
+        Route::get('/customers/check', [POSController::class, 'checkCustomer']);
+        
+        // AJAX: Search Members (Search Modal)
+        Route::get('/customers/search', [POSController::class, 'searchMembers']);
     });
 });
 
