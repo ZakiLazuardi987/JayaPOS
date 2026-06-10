@@ -271,6 +271,37 @@
     </div>
 </div>
 
+{{-- MODAL: Pisah Bayar --}}
+<div class="modal-overlay" id="modalPisahBayar" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+    <div class="loyalty-modal" style="width: 90%; max-width: 650px; background: white; border-radius: 8px; display: flex; flex-direction: column;">
+        {{-- Header --}}
+        <div class="loyalty-modal-header" style="justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid #e5e7eb;">
+            <button class="btn-loyalty-outline" id="btnBatalPisahBayar" style="border-radius: 4px; padding: 10px 24px; border: 1px solid var(--primary); color: var(--primary); background: transparent; cursor: pointer; font-weight: 500;">Batal</button>
+            <h3 class="loyalty-modal-title" id="pisahBayarTotalDisplay" style="flex: 1; text-align: center; font-size: 1.5rem; font-weight: 700; color: #111; margin: 0;">Rp 0</h3>
+            <div style="width: 80px;"></div> {{-- Spacer --}}
+        </div>
+
+        <div style="background: #fef2f2; color: #dc2626; padding: 12px; font-size: 0.85rem; text-align: center; border-bottom: 1px solid #fee2e2;">
+            Transaksi pisah bayar tidak dapat di-refund. Anda masih bisa membatalkan sebelum semua pembayaran diselesaikan.
+        </div>
+
+        {{-- Body --}}
+        <div class="loyalty-modal-body" style="padding: 24px; padding-bottom: 32px; overflow-y: auto; max-height: 60vh;">
+            <div style="font-weight: 600; color: #111; font-size: 1.1rem; margin-bottom: 16px;">
+                Bagi pembayaran menjadi : <span id="pisahBayarCount">2</span>
+            </div>
+
+            <div id="pisahBayarInputsContainer">
+                <!-- Rows will be injected here via JS -->
+            </div>
+
+            <button id="btnTambahPisahBayar" style="width: 100%; border: 1px solid var(--primary); background: transparent; color: var(--primary); padding: 14px; border-radius: 4px; font-weight: 600; font-size: 1rem; cursor: pointer; margin-top: 16px;">
+                Tambah Pembayaran
+            </button>
+        </div>
+    </div>
+</div>
+
 {{-- MODAL: Pisah Bill --}}
 <div class="modal-overlay" id="modalPisahBill" style="display:none;">
     <div class="loyalty-modal">
@@ -365,7 +396,7 @@
             {{-- Pisah Bayar --}}
             <div class="payment-section" style="padding: 16px 0; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                 <div style="font-size: 1.15rem; color: #111;">Bayar dengan beberapa metode pembayaran</div>
-                <div style="color: var(--primary); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <div id="btnPisahBayar" style="color: var(--primary); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="2" y="6" width="20" height="12" rx="2"></rect>
                         <circle cx="12" cy="12" r="2"></circle>

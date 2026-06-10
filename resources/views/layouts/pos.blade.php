@@ -21,7 +21,16 @@
     @include('partials.pos-bottom-nav')
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="{{ asset('js/pos.js') }}"></script>
+    <script src="{{ asset('js/pos/pos-core.js') }}"></script>
+    <script src="{{ asset('js/pos/pos-ui.js') }}"></script>
+    <script src="{{ asset('js/pos/pos-cart.js') }}"></script>
+    <script src="{{ asset('js/pos/pos-product.js') }}"></script>
+    <script src="{{ asset('js/pos/pos-payment.js') }}"></script>
+    <script src="{{ asset('js/pos/pos-split-payment.js') }}"></script>
+    <script src="{{ asset('js/pos/pos-split-bill.js') }}"></script>
+    <script src="{{ asset('js/pos/pos-loyalty.js') }}"></script>
+    <script src="{{ asset('js/pos/pos-table.js') }}"></script>
+    <script src="{{ asset('js/pos/pos-init.js') }}"></script>
     
     @stack('scripts')
 </body>

@@ -73,6 +73,12 @@ Route::middleware(['auth'])->group(function () {
         // AJAX: Checkout Cash
         Route::post('/checkout/cash', [POSController::class, 'checkoutCash'])->name('checkoutCash');
 
+        // AJAX: Checkout Pisah Bayar (Split Payment)
+        Route::post('/checkout/split', [POSController::class, 'checkoutSplit'])->name('checkoutSplit');
+
+        // AJAX: Cancel temp QRIS order (cleanup after split payment finalize)
+        Route::post('/order/{orderId}/cancel-temp', [POSController::class, 'cancelTempOrder'])->name('cancelTempOrder');
+
         // AJAX: Checkout QRIS
         Route::post('/checkout/qris', [POSController::class, 'checkoutQris'])->name('checkoutQris');
 

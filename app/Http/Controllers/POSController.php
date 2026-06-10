@@ -753,14 +753,7 @@ class POSController extends Controller
                                 $order->save();
                                 DB::table('orders')->where('order_id', $order->order_id)->update(['paid_at' => now()]);
                                 
-                                if ($order->member_id && $order->points_earned > 0) {
-                                    $member = \App\Models\Member::find($order->member_id);
-                                    if ($member) {
-                                        $member->current_points += $order->points_earned;
-                                        $member->lifetime_points_earned += $order->points_earned;
-                                        $member->save();
-                                    }
-                                }
+                                // Poin member sudah otomatis ditambahkan oleh MySQL Trigger trg_credit_points_after_payment
 
                                 if ($order->table_id) {
                                     DB::table('tables')->where('table_id', $order->table_id)->update(['status' => 'available']);
@@ -789,6 +782,7 @@ class POSController extends Controller
                 }
             } catch (\Exception $e) {
                 // Ignore error, kita coba lagi di interval polling berikutnya
+                \Illuminate\Support\Facades\Log::error('QRIS Error: ' . $e->getMessage());
             }
         }
 
@@ -874,5 +868,192 @@ class POSController extends Controller
                 ];
             })
         ]);
+    }
+
+    // ==========================================
+    // AJAX: Checkout Pisah Bayar (Split Payment)
+    // ==========================================
+    public function checkoutSplit(Request $request)
+    {
+        $request->validate([
+            'cart'           => 'required|array|min:1',
+            'subtotal'       => 'required|numeric|min:0',
+            'total_final'    => 'required|numeric|min:0',
+            'order_type'     => 'required|string',
+            'split_payments' => 'required|array|min:1',
+        ]);
+
+        $outletId = session('active_outlet');
+        $staffId  = auth()->user()->staff_id;
+        $createdOrderId = null;
+
+        try {
+            DB::transaction(function () use ($request, $outletId, $staffId, &$createdOrderId) {
+
+                // 1. INSERT orders (langsung status paid)
+                $tableId   = $request->table_id ?: null;
+                $tableName = $tableId
+                    ? (\App\Models\Table::find($tableId)->name ?? '')
+                    : ($request->table_number ?? '');
+
+                // Calculate earning points from DB securely
+                $pointsEarned = 0;
+                foreach ($request->cart as $item) {
+                    $productId = $item['product_id'];
+                    $isCustom  = str_starts_with((string)$productId, 'custom_');
+                    if (!$isCustom) {
+                        $product = \App\Models\Product::find($productId);
+                        if ($product) {
+                            $pointsEarned += ($product->earning_points * (int)$item['qty']);
+                        }
+                    }
+                }
+
+                $order = Order::create([
+                    'staff_id'          => $staffId,
+                    'outlet_id'         => $outletId,
+                    'member_id'         => $request->customer_id ?: null,
+                    'source'            => 'POS - In-Store',
+                    'order_type'        => $request->order_type,
+                    'table_id'          => $tableId,
+                    'table_number'      => $tableName,
+                    'pax'               => $request->pax ?? 1,
+                    'waiter_id'         => $request->waiter_id ?: null,
+                    'status'            => 'paid',
+                    'subtotal'          => $request->subtotal,
+                    'tax_id'            => $request->tax_id ?: null,
+                    'service_charge_id' => $request->service_charge_id ?: null,
+                    'discount_id'       => $request->discount_id ?: null,
+                    'discount_amount'   => $request->discount_amount ?? 0,
+                    'total_final'       => $request->total_final,
+                    'points_earned'     => $pointsEarned,
+                    'created_at'        => now(),
+                ]);
+
+                DB::table('orders')
+                    ->where('order_id', $order->order_id)
+                    ->update(['paid_at' => now()]);
+
+                $createdOrderId = $order->order_id;
+
+                // 2. INSERT order_items
+                foreach ($request->cart as $item) {
+                    $productId   = $item['product_id'];
+                    $isCustom    = str_starts_with((string)$productId, 'custom_');
+                    $dbProductId = $isCustom ? 999 : (int)$productId;
+
+                    $orderItem = OrderItem::create([
+                        'order_id'          => $order->order_id,
+                        'product_id'        => $dbProductId,
+                        'quantity'          => $isCustom ? 1 : (int)$item['qty'],
+                        'price_at_purchase' => $isCustom
+                            ? (float)$item['total_price']
+                            : (float)$item['unit_price'],
+                        'created_at'        => now(),
+                    ]);
+
+                    if (!empty($item['modifiers']) && is_array($item['modifiers'])) {
+                        foreach ($item['modifiers'] as $mod) {
+                            DB::table('order_item_modifier')->insert([
+                                'order_item_id' => $orderItem->order_item_id,
+                                'modifier_id'   => (int)$mod['id'],
+                                'price_added'   => (float)($mod['price'] ?? 0),
+                            ]);
+                        }
+                    }
+                }
+
+                // 3. INSERT multiple payment records (one per split row)
+                foreach ($request->split_payments as $pay) {
+                    $method = $pay['method'] ?? 'Cash';
+                    // Normalize method to enum values
+                    $allowedMethods = ['QRIS','GoPay','OVO','Dana','ShopeePay','Cash','Debit Card','Credit Card','Bank Transfer'];
+                    if (!in_array($method, $allowedMethods)) $method = 'Cash';
+
+                    Payment::create([
+                        'order_id'         => $order->order_id,
+                        'payment_method'   => $method,
+                        'payment_gateway'  => null,
+                        'status'           => 'success',
+                        'amount'           => (float)$pay['amount'],
+                        'payment_response' => ['split_payment' => true],
+                        'created_at'       => now(),
+                    ]);
+                }
+
+                // 4. Kredit poin ke member
+                if ($order->member_id && $pointsEarned > 0) {
+                    $member = \App\Models\Member::find($order->member_id);
+                    if ($member) {
+                        $member->current_points += $pointsEarned;
+                        $member->lifetime_points_earned += $pointsEarned;
+                        $member->save();
+                    }
+                }
+
+                // 5. Free up table
+                if ($tableId) {
+                    DB::table('tables')->where('table_id', $tableId)->update(['status' => 'available']);
+                }
+            });
+
+            return response()->json([
+                'success'  => true,
+                'order_id' => $createdOrderId,
+                'message'  => 'Pisah bayar berhasil disimpan.',
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyimpan transaksi: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // ==========================================
+    // AJAX: Cancel Temp QRIS Order (Split Payment Cleanup)
+    // ==========================================
+    public function cancelTempOrder($orderId)
+    {
+        $outletId = session('active_outlet');
+        $order = Order::where('order_id', $orderId)
+                      ->where('outlet_id', $outletId)
+                      ->first();
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Order tidak ditemukan.'], 404);
+        }
+
+        // Safety: hanya cancel order yang dibuat dalam 30 menit terakhir
+        $createdAt = \Carbon\Carbon::parse($order->created_at);
+        if ($createdAt->diffInMinutes(now()) > 30) {
+            return response()->json(['success' => false, 'message' => 'Order terlalu lama untuk dibatalkan.'], 400);
+        }
+
+        try {
+            DB::transaction(function () use ($order) {
+                // Hapus payment records terkait
+                Payment::where('order_id', $order->order_id)->delete();
+
+                // Kembalikan meja ke occupied (masih dalam proses pisah bayar)
+                if ($order->table_id) {
+                    DB::table('tables')->where('table_id', $order->table_id)->update(['status' => 'occupied']);
+                }
+
+                // Hapus order_item_modifier dan order_items
+                $itemIds = \App\Models\OrderItem::where('order_id', $order->order_id)->pluck('order_item_id');
+                DB::table('order_item_modifier')->whereIn('order_item_id', $itemIds)->delete();
+                \App\Models\OrderItem::where('order_id', $order->order_id)->delete();
+
+                // Tandai order sebagai cancelled
+                DB::table('orders')->where('order_id', $order->order_id)
+                    ->update(['status' => 'cancelled', 'paid_at' => null]);
+            });
+
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 }
