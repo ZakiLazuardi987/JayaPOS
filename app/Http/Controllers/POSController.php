@@ -213,7 +213,7 @@ class POSController extends Controller
                     'table_id' => $request->table_id,
                     'pax' => $request->pax,
                     'waiter_id' => $request->waiter_id,
-                    'order_type' => 'dine-in',
+                    'order_type' => $request->order_type ?? 'dine-in',
                     'table_number' => \App\Models\Table::find($request->table_id)->name ?? '',
                     'status' => 'pending',
                     'subtotal' => $request->subtotal,
@@ -363,6 +363,73 @@ class POSController extends Controller
     }
 
     // ==========================================
+    // AJAX: Fetch Pending Order by Pickup Code
+    // ==========================================
+    public function getOrderByPickupCode($code)
+    {
+        $outletId = session('active_outlet');
+
+        $order = Order::with([
+            'table.area',
+            'waiter',
+            'items.product',
+        ])
+            ->where('outlet_id', $outletId)
+            ->where('status', 'pending')
+            ->where('pickup_code', strtoupper($code))
+            ->first();
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesanan dengan kode ' . strtoupper($code) . ' tidak ditemukan atau sudah tidak berstatus pending.'
+            ], 404);
+        }
+
+        // Bangun cart items dari order_items (kompatibel dengan format cart JS)
+        $cartItems = $order->items->map(function ($item) use ($order) {
+            $isCustom = $item->product_id == 999;
+
+            // Ambil modifier dari pivot order_item_modifier
+            $modifiers = DB::table('order_item_modifier')
+                ->join('modifier', 'modifier.modifier_id', '=', 'order_item_modifier.modifier_id')
+                ->where('order_item_modifier.order_item_id', $item->order_item_id)
+                ->select('modifier.modifier_id as id', 'modifier.name', 'order_item_modifier.price_added as price')
+                ->get()
+                ->toArray();
+
+            return [
+                'id'          => $item->order_item_id,          // dipakai sebagai cart item id
+                'product_id'  => $isCustom ? 'custom_' . $item->order_item_id : $item->product_id,
+                'name'        => $isCustom ? 'Custom Amount' : ($item->product->name ?? 'Produk'),
+                'qty'         => $item->quantity,
+                'unit_price'  => (float) $item->price_at_purchase,
+                'total_price' => (float) ($item->price_at_purchase * $item->quantity),
+                'modifiers'   => $modifiers,
+                'discounts'   => [],
+                'order_type'  => $order->order_type ?? 'dine-in',
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'order'   => [
+                'order_id'     => $order->order_id,
+                'meja'         => $order->table->name ?? $order->table_number ?? '-',
+                'grup_meja'    => $order->table->area->name ?? '-',
+                'table_id'     => $order->table_id,
+                'pax'          => $order->pax,
+                'waiter_id'    => $order->waiter_id,
+                'waiter_name'  => $order->waiter->name ?? '-',
+                'order_type'   => $order->order_type ?? 'dine-in',
+                'subtotal'     => (float) $order->subtotal,
+                'total_final'  => (float) $order->total_final,
+            ],
+            'cart'    => $cartItems,
+        ]);
+    }
+
+    // ==========================================
     // AJAX: Update Meja Order Pending
     // ==========================================
     public function updateOrderTable(Request $request, $orderId)
@@ -443,26 +510,52 @@ class POSController extends Controller
                     }
                 }
 
-                $order = Order::create([
-                    'staff_id'          => $staffId,
-                    'outlet_id'         => $outletId,
-                    'member_id'         => $request->customer_id ?: null,
-                    'source'            => 'POS - In-Store',
-                    'order_type'        => $request->order_type,
-                    'table_id'          => $tableId,
-                    'table_number'      => $tableName,
-                    'pax'               => $request->pax ?? 1,
-                    'waiter_id'         => $request->waiter_id ?: null,
-                    'status'            => 'paid',
-                    'subtotal'          => $request->subtotal,
-                    'tax_id'            => $request->tax_id ?: null,
-                    'service_charge_id' => $request->service_charge_id ?: null,
-                    'discount_id'       => $request->discount_id ?: null,
-                    'discount_amount'   => $request->discount_amount ?? 0,
-                    'total_final'       => $request->total_final,
-                    'points_earned'     => $pointsEarned,
-                    'created_at'        => now(),
-                ]);
+                if ($request->active_order_id) {
+                    $order = Order::findOrFail($request->active_order_id);
+                    $order->update([
+                        'staff_id'          => $staffId,
+                        'outlet_id'         => $outletId,
+                        'member_id'         => $request->customer_id ?: null,
+                        'source'            => $order->source ?? 'POS - In-Store',
+                        'order_type'        => $request->order_type,
+                        'table_id'          => $tableId,
+                        'table_number'      => $tableName,
+                        'pax'               => $request->pax ?? 1,
+                        'waiter_id'         => $request->waiter_id ?: null,
+                        'status'            => 'paid',
+                        'subtotal'          => $request->subtotal,
+                        'tax_id'            => $request->tax_id ?: null,
+                        'service_charge_id' => $request->service_charge_id ?: null,
+                        'discount_id'       => $request->discount_id ?: null,
+                        'discount_amount'   => $request->discount_amount ?? 0,
+                        'total_final'       => $request->total_final,
+                        'points_earned'     => $pointsEarned,
+                    ]);
+                    $oldItemIds = \App\Models\OrderItem::where('order_id', $order->order_id)->pluck('order_item_id');
+                    \Illuminate\Support\Facades\DB::table('order_item_modifier')->whereIn('order_item_id', $oldItemIds)->delete();
+                    \App\Models\OrderItem::where('order_id', $order->order_id)->delete();
+                } else {
+                    $order = Order::create([
+                        'staff_id'          => $staffId,
+                        'outlet_id'         => $outletId,
+                        'member_id'         => $request->customer_id ?: null,
+                        'source'            => 'POS - In-Store',
+                        'order_type'        => $request->order_type,
+                        'table_id'          => $tableId,
+                        'table_number'      => $tableName,
+                        'pax'               => $request->pax ?? 1,
+                        'waiter_id'         => $request->waiter_id ?: null,
+                        'status'            => 'paid',
+                        'subtotal'          => $request->subtotal,
+                        'tax_id'            => $request->tax_id ?: null,
+                        'service_charge_id' => $request->service_charge_id ?: null,
+                        'discount_id'       => $request->discount_id ?: null,
+                        'discount_amount'   => $request->discount_amount ?? 0,
+                        'total_final'       => $request->total_final,
+                        'points_earned'     => $pointsEarned,
+                        'created_at'        => now(),
+                    ]);
+                }
 
                 // Set paid_at agar trigger kredit poin berjalan
                 DB::table('orders')
@@ -584,26 +677,52 @@ class POSController extends Controller
                     }
                 }
 
-                $order = Order::create([
-                    'staff_id'          => $staffId,
-                    'outlet_id'         => $outletId,
-                    'member_id'         => $request->customer_id ?: null,
-                    'source'            => 'POS - In-Store',
-                    'order_type'        => $request->order_type,
-                    'table_id'          => $tableId,
-                    'table_number'      => $tableName,
-                    'pax'               => $request->pax ?? 1,
-                    'waiter_id'         => $request->waiter_id ?: null,
-                    'status'            => 'pending',
-                    'subtotal'          => $request->subtotal,
-                    'tax_id'            => $request->tax_id ?: null,
-                    'service_charge_id' => $request->service_charge_id ?: null,
-                    'discount_id'       => $request->discount_id ?: null,
-                    'discount_amount'   => $request->discount_amount ?? 0,
-                    'total_final'       => $request->total_final,
-                    'points_earned'     => $pointsEarned,
-                    'created_at'        => now(),
-                ]);
+                if ($request->active_order_id) {
+                    $order = Order::findOrFail($request->active_order_id);
+                    $order->update([
+                        'staff_id'          => $staffId,
+                        'outlet_id'         => $outletId,
+                        'member_id'         => $request->customer_id ?: null,
+                        'source'            => $order->source ?? 'POS - In-Store',
+                        'order_type'        => $request->order_type,
+                        'table_id'          => $tableId,
+                        'table_number'      => $tableName,
+                        'pax'               => $request->pax ?? 1,
+                        'waiter_id'         => $request->waiter_id ?: null,
+                        'status'            => 'pending',
+                        'subtotal'          => $request->subtotal,
+                        'tax_id'            => $request->tax_id ?: null,
+                        'service_charge_id' => $request->service_charge_id ?: null,
+                        'discount_id'       => $request->discount_id ?: null,
+                        'discount_amount'   => $request->discount_amount ?? 0,
+                        'total_final'       => $request->total_final,
+                        'points_earned'     => $pointsEarned,
+                    ]);
+                    $oldItemIds = \App\Models\OrderItem::where('order_id', $order->order_id)->pluck('order_item_id');
+                    \Illuminate\Support\Facades\DB::table('order_item_modifier')->whereIn('order_item_id', $oldItemIds)->delete();
+                    \App\Models\OrderItem::where('order_id', $order->order_id)->delete();
+                } else {
+                    $order = Order::create([
+                        'staff_id'          => $staffId,
+                        'outlet_id'         => $outletId,
+                        'member_id'         => $request->customer_id ?: null,
+                        'source'            => 'POS - In-Store',
+                        'order_type'        => $request->order_type,
+                        'table_id'          => $tableId,
+                        'table_number'      => $tableName,
+                        'pax'               => $request->pax ?? 1,
+                        'waiter_id'         => $request->waiter_id ?: null,
+                        'status'            => 'pending',
+                        'subtotal'          => $request->subtotal,
+                        'tax_id'            => $request->tax_id ?: null,
+                        'service_charge_id' => $request->service_charge_id ?: null,
+                        'discount_id'       => $request->discount_id ?: null,
+                        'discount_amount'   => $request->discount_amount ?? 0,
+                        'total_final'       => $request->total_final,
+                        'points_earned'     => $pointsEarned,
+                        'created_at'        => now(),
+                    ]);
+                }
 
                 $createdOrderId = $order->order_id;
 
@@ -909,26 +1028,52 @@ class POSController extends Controller
                     }
                 }
 
-                $order = Order::create([
-                    'staff_id'          => $staffId,
-                    'outlet_id'         => $outletId,
-                    'member_id'         => $request->customer_id ?: null,
-                    'source'            => 'POS - In-Store',
-                    'order_type'        => $request->order_type,
-                    'table_id'          => $tableId,
-                    'table_number'      => $tableName,
-                    'pax'               => $request->pax ?? 1,
-                    'waiter_id'         => $request->waiter_id ?: null,
-                    'status'            => 'paid',
-                    'subtotal'          => $request->subtotal,
-                    'tax_id'            => $request->tax_id ?: null,
-                    'service_charge_id' => $request->service_charge_id ?: null,
-                    'discount_id'       => $request->discount_id ?: null,
-                    'discount_amount'   => $request->discount_amount ?? 0,
-                    'total_final'       => $request->total_final,
-                    'points_earned'     => $pointsEarned,
-                    'created_at'        => now(),
-                ]);
+                if ($request->active_order_id) {
+                    $order = Order::findOrFail($request->active_order_id);
+                    $order->update([
+                        'staff_id'          => $staffId,
+                        'outlet_id'         => $outletId,
+                        'member_id'         => $request->customer_id ?: null,
+                        'source'            => $order->source ?? 'POS - In-Store',
+                        'order_type'        => $request->order_type,
+                        'table_id'          => $tableId,
+                        'table_number'      => $tableName,
+                        'pax'               => $request->pax ?? 1,
+                        'waiter_id'         => $request->waiter_id ?: null,
+                        'status'            => 'paid',
+                        'subtotal'          => $request->subtotal,
+                        'tax_id'            => $request->tax_id ?: null,
+                        'service_charge_id' => $request->service_charge_id ?: null,
+                        'discount_id'       => $request->discount_id ?: null,
+                        'discount_amount'   => $request->discount_amount ?? 0,
+                        'total_final'       => $request->total_final,
+                        'points_earned'     => $pointsEarned,
+                    ]);
+                    $oldItemIds = \App\Models\OrderItem::where('order_id', $order->order_id)->pluck('order_item_id');
+                    \Illuminate\Support\Facades\DB::table('order_item_modifier')->whereIn('order_item_id', $oldItemIds)->delete();
+                    \App\Models\OrderItem::where('order_id', $order->order_id)->delete();
+                } else {
+                    $order = Order::create([
+                        'staff_id'          => $staffId,
+                        'outlet_id'         => $outletId,
+                        'member_id'         => $request->customer_id ?: null,
+                        'source'            => 'POS - In-Store',
+                        'order_type'        => $request->order_type,
+                        'table_id'          => $tableId,
+                        'table_number'      => $tableName,
+                        'pax'               => $request->pax ?? 1,
+                        'waiter_id'         => $request->waiter_id ?: null,
+                        'status'            => 'paid',
+                        'subtotal'          => $request->subtotal,
+                        'tax_id'            => $request->tax_id ?: null,
+                        'service_charge_id' => $request->service_charge_id ?: null,
+                        'discount_id'       => $request->discount_id ?: null,
+                        'discount_amount'   => $request->discount_amount ?? 0,
+                        'total_final'       => $request->total_final,
+                        'points_earned'     => $pointsEarned,
+                        'created_at'        => now(),
+                    ]);
+                }
 
                 DB::table('orders')
                     ->where('order_id', $order->order_id)
@@ -1055,5 +1200,96 @@ class POSController extends Controller
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    // ==========================================
+    // CETAK STRUK (PDF & Backup Thermal ESC/POS)
+    // ==========================================
+    public function cetakStruk($orderId)
+    {
+        $order = Order::with('items.product')->find($orderId);
+        
+        if (!$order) {
+            return abort(404, 'Order tidak ditemukan');
+        }
+
+        $outlet = DB::table('outlet')->where('outlet_id', $order->outlet_id)->first();
+        $staff = DB::table('staff')->where('staff_id', $order->staff_id)->first();
+        $member = DB::table('member')->where('member_id', $order->member_id)->first();
+        
+        $tax = null;
+        if ($order->tax_id) {
+            $tax = DB::table('tax')->where('tax_id', $order->tax_id)->first();
+        }
+
+        $service_charge = null;
+        if ($order->service_charge_id) {
+            $service_charge = DB::table('service_charge')->where('service_charge_id', $order->service_charge_id)->first();
+        }
+
+        /*
+        // =========================================================================
+        // KODE BACKUP UNTUK PRINTER THERMAL ESC/POS (MENGGUNAKAN mike42/escpos-php)
+        // =========================================================================
+        // Pastikan composer package sudah terinstall: composer require mike42/escpos-php
+        // 
+        // use Mike42\Escpos\PrintConnectors\WindowsPrintConnector;
+        // use Mike42\Escpos\Printer;
+        //
+        // try {
+        //     // Ganti "POS-58" dengan nama printer thermal yang tersambung di komputer/Jaringan
+        //     $connector = new WindowsPrintConnector("POS-58");
+        //     $printer = new Printer($connector);
+        //     
+        //     // Header Toko
+        //     $printer->setJustification(Printer::JUSTIFY_CENTER);
+        //     $printer->text(($outlet->name ?? 'Toko Kopi Jaya') . "\n");
+        //     $printer->text(($outlet->address ?? 'Alamat Toko') . "\n");
+        //     $printer->text("--------------------------------\n");
+        //     
+        //     // Info Order
+        //     $printer->setJustification(Printer::JUSTIFY_LEFT);
+        //     $printer->text("Nota   : " . $order->order_id . "\n");
+        //     $printer->text("Kasir  : " . ($staff->name ?? 'Kasir') . "\n");
+        //     $printer->text("Tanggal: " . \Carbon\Carbon::parse($order->created_at)->format('d-m-Y H:i') . "\n");
+        //     $printer->text("--------------------------------\n");
+        //     
+        //     // Detail Barang
+        //     foreach ($order->items as $item) {
+        //         $productName = $item->product ? $item->product->name : 'Produk';
+        //         $printer->text($productName . "\n");
+        //         $itemTotal = $item->quantity * $item->price_at_purchase;
+        //         $printer->text($item->quantity . " x " . number_format($item->price_at_purchase, 0, ',', '.') . " = " . number_format($itemTotal, 0, ',', '.') . "\n");
+        //     }
+        //     
+        //     // Totalan
+        //     $printer->text("--------------------------------\n");
+        //     $printer->setJustification(Printer::JUSTIFY_RIGHT);
+        //     $printer->text("Subtotal: Rp " . number_format($order->subtotal, 0, ',', '.') . "\n");
+        //     if ($order->discount_amount > 0) {
+        //         $printer->text("Diskon: Rp " . number_format($order->discount_amount, 0, ',', '.') . "\n");
+        //     }
+        //     $printer->text("Total: Rp " . number_format($order->total_final, 0, ',', '.') . "\n");
+        //     
+        //     $printer->text("\n");
+        //     $printer->setJustification(Printer::JUSTIFY_CENTER);
+        //     $printer->text("Terima Kasih Atas Kunjungan Anda\n");
+        //     
+        //     // Potong Kertas & Tutup
+        //     $printer->cut();
+        //     $printer->close();
+        //     
+        // } catch (\Exception $e) {
+        //     \Log::error("Gagal print struk thermal: " . $e->getMessage());
+        // }
+        // =========================================================================
+        */
+
+        // GENERATE PDF MENGGUNAKAN barryvdh/laravel-dompdf
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.struk-pdf', compact('order', 'outlet', 'staff', 'member', 'tax', 'service_charge'));
+        // Ukuran kertas thermal 80mm. 80mm ~ 226.77 pt width. Height di set otomatis atau panjang.
+        $pdf->setPaper([0, 0, 226.77, 800], 'portrait'); 
+        
+        return $pdf->stream('struk-' . $order->order_id . '.pdf');
     }
 }

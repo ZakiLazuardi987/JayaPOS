@@ -67,6 +67,9 @@ Route::middleware(['auth'])->group(function () {
         // AJAX: Detail Order (follow-up bill)
         Route::get('/orders/{id}/detail', [POSController::class, 'getOrderDetail'])->name('orderDetail');
 
+        // AJAX: Fetch Pending Order by Pickup Code (Kiosk/CRM integration)
+        Route::get('/orders/pickup/{code}', [POSController::class, 'getOrderByPickupCode'])->name('getOrderByPickupCode');
+
         // AJAX: Update Meja Order Pending
         Route::patch('/orders/{id}/update-table', [POSController::class, 'updateOrderTable'])->name('updateOrderTable');
 
@@ -78,6 +81,9 @@ Route::middleware(['auth'])->group(function () {
 
         // AJAX: Cancel temp QRIS order (cleanup after split payment finalize)
         Route::post('/order/{orderId}/cancel-temp', [POSController::class, 'cancelTempOrder'])->name('cancelTempOrder');
+
+        // Cetak Struk (PDF)
+        Route::get('/order/{orderId}/print', [POSController::class, 'cetakStruk'])->name('printStruk');
 
         // AJAX: Checkout QRIS
         Route::post('/checkout/qris', [POSController::class, 'checkoutQris'])->name('checkoutQris');

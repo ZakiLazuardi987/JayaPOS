@@ -289,6 +289,14 @@
                 modalBillBaru.style.display = 'none';
                 overlayPilihMeja.style.display = 'none';
 
+                // Tentukan order_type & service_charge
+                const orderType = cart.length > 0 ? (cart[0].order_type || 'dine-in') : 'dine-in';
+                let scConfig = window.POS_CONFIG?.serviceCharges?.find(c => {
+                    let typeKeyword = orderType === 'dine-in' ? 'dine' : orderType;
+                    return c.name.toLowerCase().includes(typeKeyword);
+                });
+                const serviceChargeId = scConfig ? scConfig.service_charge_id : null;
+
                 fetch('/pos/orders/save-bill', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf.getAttribute('content') },
@@ -296,12 +304,13 @@
                         table_id: selectedTable.id,
                         pax: paxCount,
                         waiter_id: selectedWaiter.id,
+                        order_type: orderType,
                         cart: cart,
                         subtotal: subtotal,
                         discount_amount: discountAmount,
                         total_final: grandTotal,
                         tax_id: window.POS_CONFIG?.taxes?.[0]?.tax_id || null,
-                        service_charge_id: window.POS_CONFIG?.serviceCharges?.[0]?.service_charge_id || null,
+                        service_charge_id: serviceChargeId,
                         discount_id: cart[0]?.discounts?.[0]?.id || null // standard discount fallback
                     })
                 })
@@ -585,3 +594,129 @@
             });
         });
     }
+
+    // =========================================================
+    // CETAK BILL SEMENTARA
+    // =========================================================
+    const btnCetakBillLuar = document.getElementById('btnCetakBillLuar');
+    if (btnCetakBillLuar) {
+        btnCetakBillLuar.addEventListener('click', () => {
+            const activeOrderId = localStorage.getItem('active_order_id');
+            if (activeOrderId) {
+                window.open('/pos/order/' + activeOrderId + '/print', '_blank');
+            } else {
+                showToast('Harap simpan bill terlebih dahulu sebelum mencetak.', true);
+            }
+        });
+    }
+
+// =========================================================
+// TARIK KODE KIOSK / CRM
+// =========================================================
+const btnKodeKiosk = document.getElementById("btnKodeKiosk");
+const modalKioskCode = document.getElementById("modalKioskCode");
+const btnBatalKioskCode = document.getElementById("btnBatalKioskCode");
+const btnProsesKioskCode = document.getElementById("btnProsesKioskCode");
+const inputKioskCode = document.getElementById("inputKioskCode");
+const kioskCodeError = document.getElementById("kioskCodeError");
+
+if (btnKodeKiosk && modalKioskCode) {
+    btnKodeKiosk.addEventListener("click", () => {
+        modalKioskCode.style.display = "flex";
+        inputKioskCode.value = "";
+        kioskCodeError.innerText = "";
+        inputKioskCode.focus();
+    });
+}
+
+if (btnBatalKioskCode && modalKioskCode) {
+    btnBatalKioskCode.addEventListener("click", () => {
+        modalKioskCode.style.display = "none";
+    });
+}
+
+if (modalKioskCode) {
+    modalKioskCode.addEventListener("click", (e) => {
+        if (e.target === modalKioskCode) modalKioskCode.style.display = "none";
+    });
+}
+
+if (btnProsesKioskCode && inputKioskCode) {
+    btnProsesKioskCode.addEventListener("click", processKioskCode);
+    inputKioskCode.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") processKioskCode();
+    });
+
+    function processKioskCode() {
+        const code = inputKioskCode.value.trim().toUpperCase();
+        if (!code) {
+            kioskCodeError.innerText = "Harap masukkan kode.";
+            return;
+        }
+
+        kioskCodeError.innerText = "";
+        btnProsesKioskCode.innerHTML = "Memproses...";
+        btnProsesKioskCode.disabled = true;
+
+        fetch(`/pos/orders/pickup/${code}`, {
+            headers: {
+                "X-CSRF-TOKEN": document.querySelector("meta[name=\"csrf-token\"]").getAttribute("content"),
+                "Accept": "application/json",
+            }
+        })
+        .then(r => r.json())
+        .then(res => {
+            btnProsesKioskCode.innerHTML = "Proses Kode";
+            btnProsesKioskCode.disabled = false;
+
+            if (!res.success) {
+                kioskCodeError.innerText = res.message || "Gagal menarik pesanan.";
+                return;
+            }
+
+            const order = res.order;
+
+            // 1. Simpan activeOrderId
+            localStorage.setItem("active_order_id", order.order_id);
+
+            // 2. Restore cart dari order items
+            cart = res.cart.map((item, idx) => ({
+                ...item,
+                id: item.id || (Date.now() + idx),
+            }));
+            saveCart();
+
+            // 3. Set active_table (biasanya walk-in/kiosk tidak ada meja, tapi kalau ada kita set)
+            if (order.table_id) {
+                const activeTableObj = {
+                    id:           order.table_id,
+                    name:         order.meja,
+                    pax:          order.pax,
+                    waiter_id:    order.waiter_id,
+                    waiter_name:  order.waiter_name,
+                };
+                localStorage.setItem("active_table", JSON.stringify(activeTableObj));
+            } else {
+                localStorage.removeItem("active_table");
+            }
+
+            // 3. Set order type global sesuai order
+            selectedOrderType = order.order_type || "takeaway";
+            if (typeof labelOrderType !== "undefined" && labelOrderType) {
+                labelOrderType.innerText = typeof orderTypeLabels !== "undefined" ? (orderTypeLabels[selectedOrderType] || selectedOrderType) : selectedOrderType;
+            }
+
+            // 4. Tutup modal
+            modalKioskCode.style.display = "none";
+
+            // 5. Re-render cart
+            if (typeof renderCart === "function") renderCart();
+            if (typeof showToast === "function") showToast(`Pesanan ${code} berhasil ditarik.`);
+        })
+        .catch(() => {
+            btnProsesKioskCode.innerHTML = "Proses Kode";
+            btnProsesKioskCode.disabled = false;
+            kioskCodeError.innerText = "Gagal terhubung ke server.";
+        });
+    }
+}

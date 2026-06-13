@@ -8,12 +8,13 @@
 <div class="right-panel" id="right-panel-main">
 
     {{-- HEADER: Daftar Bill + Tambah Pelanggan --}}
-    <div class="bill-header">
-        <button class="btn-daftar-bill" id="btnDaftarBill">
+    <div class="bill-header" style="display: flex;">
+        <button class="btn-daftar-bill" id="btnDaftarBill" style="flex: 1;">
             <img src="{{ asset('assets/listbill_icon.png') }}" alt="Daftar Bill" style="width: 32px; height: 32px; object-fit: contain;">
             Daftar Bill
         </button>
-        <button class="btn-tambah-pelanggan" id="btnTambahPelanggan">+ Tambah Pelanggan</button>
+        <button class="btn-tambah-pelanggan" id="btnTambahPelanggan" style="flex: 2;">+ Tambah Pelanggan</button>
+        <button class="btn-tambah-pelanggan" id="btnKodeKiosk" style="flex: 1; background-color: var(--primary); color: white;">Kode</button>
     </div>
 
     {{-- ORDER TYPE SELECTOR — klik untuk pilih tipe penjualan --}}
@@ -73,7 +74,7 @@
     <div class="bill-footer">
         <div class="bill-actions-row">
             <button class="btn-simpan" id="btnSimpanBillTrigger">Simpan Bill</button>
-            <button class="btn-cetak">Cetak Bill</button>
+            <button class="btn-cetak" id="btnCetakBillLuar">Cetak Bill</button>
         </div>
         <div class="bill-pay-row">
             <button class="btn-pisah" id="btnPisahBill" disabled style="opacity: 1; pointer-events: none;">
@@ -507,7 +508,7 @@
 
         <img src="{{ asset('assets/payment_check.png') }}" alt="Check" style="width:120px; margin-top:32px;">
 
-        <div style="width:100%; margin-top:32px;">
+        <div style="width:100%; margin-top:32px; display: none;">
             <div style="display:flex; margin-bottom:16px;">
                 <input type="email" placeholder="Struk Email" style="flex:1; padding:12px; border:1px solid #9ca3af; border-radius:4px 0 0 4px; outline:none; font-family:inherit; font-size:1rem;">
                 <button style="background:#f87171; color:white; border:none; padding:0 24px; border-radius:0 4px 4px 0; font-weight:600; cursor:pointer;">Kirim</button>
@@ -518,7 +519,7 @@
             </div>
         </div>
 
-        <button id="btnCetakStrukSuccess" style="width:100%; background:var(--primary); color:white; border:none; padding:14px; border-radius:4px; font-weight:600; font-size:1.05rem; cursor:pointer; margin-bottom:16px;">Cetak Struk</button>
+        <button id="btnCetakStrukSuccess" style="width:100%; background:var(--primary); color:white; border:none; padding:14px; border-radius:4px; font-weight:600; font-size:1.05rem; cursor:pointer; margin-bottom:16px; margin-top: 32px;">Cetak Struk</button>
         <button id="btnTransaksiBaru" style="width:100%; background:transparent; color:var(--primary); border:1px solid var(--primary); padding:14px; border-radius:4px; font-weight:600; font-size:1.05rem; cursor:pointer;">Transaksi Baru</button>
     </div>
 </div>
@@ -664,6 +665,33 @@
                     @endif
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+{{-- MODAL: Tarik Pesanan Kiosk/CRM --}}
+<div class="modal-overlay" id="modalKioskCode" style="display:none;">
+    <div class="loyalty-modal">
+        {{-- Header --}}
+        <div class="loyalty-modal-header" style="justify-content: space-between;">
+            <button class="btn-loyalty-outline" id="btnBatalKioskCode">Batal</button>
+            <h3 class="loyalty-modal-title" style="flex: 1; text-align: center;">Tarik Pesanan</h3>
+            <div style="width: 70px;"></div> {{-- Spacer --}}
+        </div>
+        <div class="loyalty-modal-divider"></div>
+
+        {{-- Body --}}
+        <div class="loyalty-modal-body" style="padding: 24px;">
+            <div style="text-align: center; margin-bottom: 16px;">
+                <p style="color: #6b7280; font-size: 0.95rem;">Masukkan 6 digit kode dari Kiosk atau CRM.</p>
+            </div>
+            <div style="position: relative; margin-bottom: 16px;">
+                <input type="text" id="inputKioskCode" class="loyalty-input" placeholder="Misal: ABC123" maxlength="6" style="width: 100%; padding: 12px; font-size: 1.25rem; font-weight: bold; text-align: center; text-transform: uppercase; letter-spacing: 4px; border: 2px solid var(--primary); border-radius: 4px; outline: none;">
+            </div>
+
+            <button class="btn-loyalty-check" id="btnProsesKioskCode" style="width: 100%; margin-bottom: 8px; background: var(--primary); color: white; border: none; padding: 12px; border-radius: 4px; font-weight: 600; cursor: pointer;">
+                Proses Kode
+            </button>
+            <div id="kioskCodeError" style="color: #ef4444; font-size: 0.85rem; text-align: center; min-height: 20px;"></div>
         </div>
     </div>
 </div>

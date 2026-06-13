@@ -190,6 +190,7 @@
     function finalizeSplitPayment() {
         const grandTotal = window.splitBillActive ? window.splitBillSummaryData.grandTotal : currentGrandTotal;
         const activeTable = JSON.parse(localStorage.getItem('active_table') || 'null');
+        const activeOrderId = localStorage.getItem('active_order_id') || null;
         const orderType = cart.length > 0 ? (cart[0].order_type || 'dine-in') : 'dine-in';
         const taxId = (window.POS_CONFIG?.taxes?.[0]?.tax_id) || null;
         let scConfig = window.POS_CONFIG?.serviceCharges?.find(c => {
@@ -208,6 +209,7 @@
             }
         });
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const selectedStaffId = document.getElementById('waiterCashSelect')?.value || null;
 
         const payload = {
             cart:               cart,
@@ -223,6 +225,7 @@
             service_charge_id:  serviceChargeId,
             discount_id:        null,
             customer_id:        window.activeCustomer ? window.activeCustomer.id : null,
+            active_order_id:    activeOrderId,
             split_payments:     splitPaymentRows.map(r => ({
                 method: r.isEwallet ? 'QRIS' : 'Cash',
                 amount: r.amount

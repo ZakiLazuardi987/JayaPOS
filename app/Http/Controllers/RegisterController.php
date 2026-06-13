@@ -19,7 +19,7 @@ class RegisterController extends Controller
         $validated = $request->validate([
             'name'     => ['required', 'string', 'max:100'],
             'phone'    => ['required', 'string', 'max:20', 'unique:staff,phone'], // Langsung validasi 'phone'
-            'email'    => ['required', 'string', 'email', 'max:100', 'unique:staff,username'], 
+            'email'    => ['required', 'string', 'email', 'max:100', 'unique:staff,username'],
             'password' => ['required', 'confirmed', Password::min(8)],
         ], [
             'name.required'      => 'Nama wajib diisi.',
@@ -34,14 +34,14 @@ class RegisterController extends Controller
         $user = Staff::create([
             'name'      => $validated['name'],
             'phone'     => $validated['phone'], // Berisi data utuh dari plugin (cth: +628123456)
-            'username'  => $validated['email'], 
+            'username'  => $validated['email'],
             'password'  => Hash::make($validated['password']),
-            'role'      => 'cashier', 
-            'outlet_id' => null,  
-            'is_active' => false, 
+            'role'      => 'cashier',
+            'outlet_id' => 1,  // Default ke Outlet Matos (ID 1) untuk UAT
+            'is_active' => true, // Langsung aktif untuk UAT
         ]);
 
         return redirect('/')
-            ->with('success', 'Akun berhasil didaftarkan, menunggu validasi admin.');
+            ->with('success', 'Akun berhasil didaftarkan. Anda bisa langsung Login sekarang.');
     }
 }

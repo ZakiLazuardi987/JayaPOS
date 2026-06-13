@@ -235,6 +235,7 @@
                 service_charge_id:  serviceChargeId,
                 discount_id:        discountId,
                 customer_id:        window.activeCustomer ? window.activeCustomer.id : null,
+                active_order_id:    activeOrderId,
             };
 
             if (isEwallet) {
@@ -470,5 +471,17 @@
             if(modalTunaiSuccess) modalTunaiSuccess.style.display = 'none';
             localStorage.removeItem('pos_customer');
             window.location.reload();
+        });
+    }
+
+    const btnCetakStrukSuccess = document.getElementById('btnCetakStrukSuccess');
+    if (btnCetakStrukSuccess) {
+        btnCetakStrukSuccess.addEventListener('click', () => {
+            if (window.lastOrderId) {
+                // Open PDF in a new tab
+                window.open('/pos/order/' + window.lastOrderId + '/print', '_blank');
+            } else {
+                showToast('ID Order tidak ditemukan, gagal mencetak.', true);
+            }
         });
     }
