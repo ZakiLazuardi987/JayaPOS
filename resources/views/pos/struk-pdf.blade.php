@@ -35,7 +35,18 @@
 </head>
 <body>
     <div class="text-center">
-        <img src="{{ public_path('assets/jaya_text.png') }}" alt="Logo" style="width: 120px; margin-bottom: 6px;">
+        @php
+            $imagePath = public_path('assets/jaya_text.png');
+            $base64Logo = '';
+            if (file_exists($imagePath)) {
+                $type = pathinfo($imagePath, PATHINFO_EXTENSION);
+                $data = file_get_contents($imagePath);
+                $base64Logo = 'data:image/' . $type . ';base64,' . base64_encode($data);
+            }
+        @endphp
+        @if($base64Logo)
+            <img src="{{ $base64Logo }}" alt="Logo" style="width: 120px; margin-bottom: 6px;">
+        @endif
         <h2 style="margin: 0; font-size: 14px; margin-bottom: 2px;">{{ $outlet->name ?? 'TOKO KOPI JAYA' }}</h2>
         <div>{{ $outlet->address ?? 'Alamat Outlet' }}</div>
         @if($outlet && $outlet->phone)
