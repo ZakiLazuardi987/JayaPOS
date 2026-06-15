@@ -143,6 +143,37 @@
             <td class="font-bold" style="font-size: 13px; padding-top: 6px;">Total</td>
             <td class="font-bold text-right" style="font-size: 13px; padding-top: 6px; white-space: nowrap;">Rp {{ number_format($order->total_final, 0, ',', '.') }}</td>
         </tr>
+        @if(isset($payment))
+        <tr>
+            <td style="padding-top: 6px; font-size: 12px;">Metode Pembayaran</td>
+            <td class="text-right" style="padding-top: 6px; font-size: 12px; white-space: nowrap;">{{ strtoupper($payment->payment_method) }}</td>
+        </tr>
+        @if(strtolower($payment->payment_method) == 'cash' || strtolower($payment->payment_method) == 'tunai')
+        @php
+            // Ambil nominal bayar & kembalian (fallback dari DB JSON jika kolom baru belum terisi)
+            $amountPaid = $payment->amount_paid;
+            $changeAmount = $payment->change_amount;
+            if (is_null($amountPaid)) {
+                $resp = json_decode($payment->payment_response, true);
+                if (is_array($resp) && isset($resp['amount_tendered'])) {
+                    $amountPaid = $resp['amount_tendered'];
+                    $changeAmount = $resp['change'] ?? 0;
+                } else {
+                    $amountPaid = $payment->amount ?? $order->total_final;
+                    $changeAmount = 0;
+                }
+            }
+        @endphp
+        <tr>
+            <td style="font-size: 12px;">Tunai</td>
+            <td class="text-right" style="font-size: 12px; white-space: nowrap;">Rp {{ number_format($amountPaid, 0, ',', '.') }}</td>
+        </tr>
+        <tr>
+            <td style="font-size: 12px;">Kembalian</td>
+            <td class="text-right" style="font-size: 12px; white-space: nowrap;">Rp {{ number_format($changeAmount, 0, ',', '.') }}</td>
+        </tr>
+        @endif
+        @endif
     </table>
 
     <div class="separator"></div>

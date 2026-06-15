@@ -598,6 +598,8 @@ class POSController extends Controller
                     'payment_gateway'  => null,
                     'status'           => 'success',
                     'amount'           => $request->total_final,
+                    'amount_paid'      => $request->amount_paid,
+                    'change_amount'    => $request->amount_paid - $request->total_final,
                     'payment_response' => [
                         'amount_tendered' => $request->amount_paid,
                         'change'          => $request->amount_paid - $request->total_final,
@@ -800,6 +802,8 @@ class POSController extends Controller
                     'payment_response'=> $midtransData,
                     'status'          => 'pending',
                     'amount'          => $request->total_final,
+                    'amount_paid'     => $request->total_final,
+                    'change_amount'   => 0,
                     'created_at'      => now(),
                 ]);
 
@@ -1285,8 +1289,10 @@ class POSController extends Controller
         // =========================================================================
         */
 
+        $payment = DB::table('payment')->where('order_id', $order->order_id)->orderBy('payment_id', 'desc')->first();
+
         // GENERATE PDF MENGGUNAKAN barryvdh/laravel-dompdf
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.struk-pdf', compact('order', 'outlet', 'staff', 'member', 'tax', 'service_charge'));
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.struk-pdf', compact('order', 'outlet', 'staff', 'member', 'tax', 'service_charge', 'payment'));
         // Ukuran kertas thermal 80mm. 80mm ~ 226.77 pt width. Height di set otomatis atau panjang.
         $pdf->setPaper([0, 0, 226.77, 800], 'portrait'); 
         

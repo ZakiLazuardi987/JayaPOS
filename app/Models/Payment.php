@@ -18,6 +18,8 @@ class Payment extends Model
         'payment_response',
         'status',
         'amount',
+        'amount_paid',
+        'change_amount',
         'paid_at',
         'expired_at',
     ];
