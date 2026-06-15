@@ -682,10 +682,10 @@
         {{-- Body --}}
         <div class="loyalty-modal-body" style="padding: 24px;">
             <div style="text-align: center; margin-bottom: 16px;">
-                <p style="color: #6b7280; font-size: 0.95rem;">Masukkan 6 digit kode dari Kiosk atau CRM.</p>
+                <p style="color: #6b7280; font-size: 0.95rem;">Masukkan kode pesanan dari Kiosk atau CRM.</p>
             </div>
             <div style="position: relative; margin-bottom: 16px;">
-                <input type="text" id="inputKioskCode" class="loyalty-input" placeholder="Misal: ABC123" maxlength="6" style="width: 100%; padding: 12px; font-size: 1.25rem; font-weight: bold; text-align: center; text-transform: uppercase; letter-spacing: 4px; border: 2px solid var(--primary); border-radius: 4px; outline: none;">
+                <input type="text" id="inputKioskCode" class="loyalty-input" placeholder="Misal: APP001" style="width: 100%; padding: 12px; font-size: 1.25rem; font-weight: bold; text-align: center; text-transform: uppercase; letter-spacing: 4px; border: 2px solid var(--primary); border-radius: 4px; outline: none;">
             </div>
 
             <button class="btn-loyalty-check" id="btnProsesKioskCode" style="width: 100%; margin-bottom: 8px; background: var(--primary); color: white; border: none; padding: 12px; border-radius: 4px; font-weight: 600; cursor: pointer;">
