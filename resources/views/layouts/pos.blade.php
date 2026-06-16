@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="staff-id" content="{{ auth()->id() ?? '' }}">
     <title>Menu POS - JAYA POS</title>
+    <link rel="icon" type="image/png" href="{{ asset('assets/jaya_square.png') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     {{-- <link rel="stylesheet" href="{{ asset('css/pos.css') }}"> --}}
     <link rel="stylesheet" href="{{ asset('css/pos-global.css') }}">

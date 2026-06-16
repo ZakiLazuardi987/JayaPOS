@@ -232,8 +232,8 @@
         {{-- Tabs --}}
         <div class="daftar-bill-tabs">
             <button class="daftar-bill-tab active" data-tab="open">Open Bill</button>
-            <button class="daftar-bill-tab" data-tab="pembatalan-bill">Pembatalan Bill</button>
-            <button class="daftar-bill-tab" data-tab="pembatalan-produk">Pembatalan Produk</button>
+            <button class="daftar-bill-tab" data-tab="pembatalan-bill" style="display: none;">Pembatalan Bill</button>
+            <button class="daftar-bill-tab" data-tab="pembatalan-produk" style="display: none;">Pembatalan Produk</button>
         </div>
 
         {{-- Search --}}
