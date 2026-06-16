@@ -546,8 +546,11 @@
         <button style="display:none; width:100%; max-width:300px; background:transparent; color:var(--primary); border:1px solid var(--primary); padding:12px; border-radius:4px; font-weight:600; cursor:pointer; margin-top:32px;">Cetak QR Code</button>
 
         <div style="text-align:center; margin-top:32px;">
-            <div style="font-weight:700; color:#111; margin-bottom:4px;">Toko Kopi Jaya Tenes</div>
-            <div style="color:#111;">Jl. Tenes</div>
+            @php
+                $activeOutlet = \App\Models\Outlet::find(session('active_outlet'));
+            @endphp
+            <div style="font-weight:700; color:#111; margin-bottom:4px;">{{ $activeOutlet->name ?? 'Toko Kopi Jaya' }}</div>
+            <div style="color:#111;">{{ $activeOutlet->address ?? '-' }}</div>
         </div>
 
         <div style="margin-top:32px; position:relative; width:80px; height:80px; display:flex; justify-content:center; align-items:center;">
