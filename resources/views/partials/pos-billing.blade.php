@@ -543,7 +543,7 @@
             <img id="qrisMainImage" src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=JayaPOS" alt="QR Code" style="width:200px; height:200px;">
         </div>
 
-        <button style="width:100%; max-width:300px; background:transparent; color:var(--primary); border:1px solid var(--primary); padding:12px; border-radius:4px; font-weight:600; cursor:pointer; margin-top:32px;">Cetak QR Code</button>
+        <button style="display:none; width:100%; max-width:300px; background:transparent; color:var(--primary); border:1px solid var(--primary); padding:12px; border-radius:4px; font-weight:600; cursor:pointer; margin-top:32px;">Cetak QR Code</button>
 
         <div style="text-align:center; margin-top:32px;">
             <div style="font-weight:700; color:#111; margin-bottom:4px;">Toko Kopi Jaya Tenes</div>
