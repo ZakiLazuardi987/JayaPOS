@@ -1252,6 +1252,7 @@ class POSController extends Controller
             'tanggal'        => \Carbon\Carbon::parse($order->created_at)->timezone('Asia/Jakarta')->format('d-m-Y H:i'),
             'orderType'      => $order->order_type ?? '-',
             'status'         => $order->status ?? 'pending',
+            'source'         => $order->source ?? 'POS - In-Store',
             'member'         => $member ? $member->name : null,
             'items'          => $items,
             'subtotal'       => $subtotal,

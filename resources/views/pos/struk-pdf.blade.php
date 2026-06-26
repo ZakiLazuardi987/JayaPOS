@@ -81,6 +81,13 @@
             <td>:</td>
             <td style="font-weight: bold;">{{ $order->pickup_code }}</td>
         </tr>
+        <tr>
+            <td>
+                Sumber
+            </td>
+            <td>:</td>
+            <td style="font-weight: bold; text-transform: uppercase;">{{ $order->source ?? 'POS - In-Store' }}</td>
+        </tr>
         @endif
         @if($member)
         <tr>

@@ -204,6 +204,7 @@ window.printBluetoothReceipt = async function (data) {
     buf.push(...enc.encode("Kasir   : " + (data.kasir || "-") + "\n"));
     if (data.pickupCode) {
         buf.push(...enc.encode("Kode Pesanan: " + data.pickupCode + "\n"));
+        buf.push(...enc.encode("Sumber      : " + (data.source || "-").toUpperCase() + "\n"));
     }
     if (data.member) {
         buf.push(...enc.encode("Pelanggan: " + data.member + "\n"));
