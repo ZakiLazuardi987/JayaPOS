@@ -11,7 +11,7 @@
     const pisahBillProductList = document.getElementById('pisahBillProductList');
     const pisahBillBreakdown = document.getElementById('pisahBillBreakdown');
 
-    let selectedSplitItems = {};
+    window.selectedSplitItems = {};
 
     if (btnPisahBill && modalPisahBill) {
         btnPisahBill.addEventListener('click', () => {
@@ -29,7 +29,7 @@
             // Bersihkan state split
             window.splitBillActive = false;
             window.splitBillSummaryData = null;
-            selectedSplitItems = {};
+            window.selectedSplitItems = {};
             // renderCart() sudah menghitung diskon + pajak + service charge
             // dan memperbarui tombol "Bayar" dengan total yang benar
             renderCart();
@@ -38,13 +38,14 @@
 
     if (btnPisahBillPisahkan && modalPisahBill && modalLoyalty) {
         btnPisahBillPisahkan.addEventListener('click', () => {
-            const hasSelection = Object.values(selectedSplitItems).some(s => s.selected && s.qty > 0);
+            const hasSelection = Object.values(window.selectedSplitItems).some(s => s.selected && s.qty > 0);
             if (!hasSelection) {
                 showToast('Pilih minimal satu produk untuk dipisahkan', true);
                 return;
             }
 
             window.splitBillActive = true;
+            window.isCheckoutFlow = true;
             modalPisahBill.style.display = 'none';
 
             const titleEl = modalLoyalty.querySelector('.loyalty-modal-title');
@@ -58,16 +59,16 @@
             modalLoyalty.style.display = 'none';
             window.splitBillActive = false;
             window.splitBillSummaryData = null;
-            selectedSplitItems = {};
+            window.selectedSplitItems = {};
             // renderCart() menghitung ulang total termasuk diskon + pajak
             renderCart();
         });
     }
 
     function openPisahBillModal() {
-        selectedSplitItems = {};
+        window.selectedSplitItems = {};
         cart.forEach(item => {
-            selectedSplitItems[item.id] = {
+            window.selectedSplitItems[item.id] = {
                 qty: 1,
                 selected: false,
                 maxQty: item.qty
@@ -105,7 +106,7 @@
             pisahBillProductList.appendChild(header);
 
             items.forEach(item => {
-                const splitState = selectedSplitItems[item.id] || { qty: 1, selected: false };
+                const splitState = window.selectedSplitItems[item.id] || { qty: 1, selected: false };
                 let imgSrc = '/images/default.jpg';
                 if (item.img_url) {
                     imgSrc = item.img_url.startsWith('http') || item.img_url.startsWith('/') ? item.img_url : '/' + item.img_url;
@@ -141,7 +142,7 @@
                 const checkboxCircle = row.querySelector('.pisah-bill-checkbox-circle');
 
                 const updateRowVisualState = () => {
-                    const activeState = selectedSplitItems[item.id];
+                    const activeState = window.selectedSplitItems[item.id];
                     if (activeState.selected) {
                         checkboxCircle.classList.add('selected');
                         minusBtn.classList.add('active');
@@ -156,12 +157,12 @@
                 };
 
                 checkboxCircle.addEventListener('click', () => {
-                    selectedSplitItems[item.id].selected = !selectedSplitItems[item.id].selected;
+                    window.selectedSplitItems[item.id].selected = !window.selectedSplitItems[item.id].selected;
                     updateRowVisualState();
                 });
 
                 minusBtn.addEventListener('click', () => {
-                    const activeState = selectedSplitItems[item.id];
+                    const activeState = window.selectedSplitItems[item.id];
                     if (activeState.qty > 1) {
                         activeState.qty--;
                     } else if (activeState.qty === 1 && activeState.selected) {
@@ -171,7 +172,7 @@
                 });
 
                 plusBtn.addEventListener('click', () => {
-                    const activeState = selectedSplitItems[item.id];
+                    const activeState = window.selectedSplitItems[item.id];
                     if (activeState.qty < activeState.maxQty) {
                         activeState.qty++;
                         activeState.selected = true;
@@ -193,7 +194,7 @@
         let activeChargeLabel = 'Biaya Tambahan';
         
         cart.forEach(item => {
-            const splitState = selectedSplitItems[item.id];
+            const splitState = window.selectedSplitItems[item.id];
             if (splitState && splitState.selected && splitState.qty > 0) {
                 const itemQty = splitState.qty;
                 const itemSubtotal = item.unit_price * itemQty;

@@ -85,6 +85,9 @@ Route::middleware(['auth'])->group(function () {
         // Cetak Struk (PDF)
         Route::get('/order/{orderId}/print', [POSController::class, 'cetakStruk'])->name('printStruk');
 
+        // Data Struk (JSON untuk Bluetooth ESC/POS Printer)
+        Route::get('/order/{orderId}/struk-data', [POSController::class, 'getStrukData'])->name('getStrukData');
+
         // AJAX: Checkout QRIS
         Route::post('/checkout/qris', [POSController::class, 'checkoutQris'])->name('checkoutQris');
 

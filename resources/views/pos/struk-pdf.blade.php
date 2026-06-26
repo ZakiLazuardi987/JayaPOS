@@ -72,11 +72,7 @@
             <td>:</td>
             <td>{{ $staff->name ?? 'Kasir' }}</td>
         </tr>
-        <tr>
-            <td>Sumber</td>
-            <td>:</td>
-            <td>{{ $order->source ?? 'POS - In-Store' }}</td>
-        </tr>
+
         @if($order->pickup_code)
         <tr>
             <td>

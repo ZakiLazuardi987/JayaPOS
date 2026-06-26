@@ -26,6 +26,7 @@
     <script src="{{ asset('js/pos/pos-ui.js') }}"></script>
     <script src="{{ asset('js/pos/pos-cart.js') }}"></script>
     <script src="{{ asset('js/pos/pos-product.js') }}"></script>
+    <script src="{{ asset('js/pos/pos-printer.js') }}"></script>
     <script src="{{ asset('js/pos/pos-payment.js') }}"></script>
     <script src="{{ asset('js/pos/pos-split-payment.js') }}"></script>
     <script src="{{ asset('js/pos/pos-split-bill.js') }}"></script>

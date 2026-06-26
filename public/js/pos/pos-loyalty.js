@@ -26,7 +26,7 @@
     const loyaltyPhone = document.getElementById('loyaltyPhone');
     const loyaltySubtitleText = document.getElementById('loyaltySubtitleText');
 
-    let isCheckoutFlow = false;
+    window.isCheckoutFlow = false;
 
     window.activeCustomer = JSON.parse(localStorage.getItem('pos_customer')) || null;
 
@@ -36,7 +36,7 @@
                 showToast('Keranjang masih kosong', true);
                 return;
             }
-            isCheckoutFlow = true;
+            window.isCheckoutFlow = true;
             
             // Siapkan UI Modal Loyalty
             const pts = cart.reduce((sum, item) => sum + ((item.earning_points || 0) * item.qty), 0);
@@ -139,7 +139,7 @@
 
     if (btnTambahPelanggan) {
         btnTambahPelanggan.addEventListener('click', () => {
-            isCheckoutFlow = false;
+            window.isCheckoutFlow = false;
             if (!window.activeCustomer) {
                 // Open Search Member Modal
                 if (modalSearchMember) {
@@ -216,7 +216,7 @@
                 }
                 closeLoyaltyModal();
                 
-                if (isCheckoutFlow) {
+                if (window.isCheckoutFlow) {
                     const modalStaff = document.getElementById('modalStaff');
                     if (modalStaff) {
                         modalStaff.style.display = 'flex';

@@ -221,10 +221,22 @@
                 }
             });
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const isSplit = window.splitBillActive;
+            const finalCart = isSplit ? cart.filter(item => {
+                const splitState = window.selectedSplitItems[item.id];
+                return splitState && splitState.selected && splitState.qty > 0;
+            }).map(item => ({
+                ...item,
+                qty: window.selectedSplitItems[item.id].qty,
+                total_price: window.selectedSplitItems[item.id].qty * item.unit_price
+            })) : cart;
+            const finalSubtotal = isSplit ? window.splitBillSummaryData.subtotal : rawSubtotal;
+            const finalDiscount = isSplit ? window.splitBillSummaryData.discount : totalDiscAmt;
+
             const basePayload = {
-                cart:               cart,
-                subtotal:           rawSubtotal,
-                discount_amount:    totalDiscAmt,
+                cart:               finalCart,
+                subtotal:           finalSubtotal,
+                discount_amount:    finalDiscount,
                 total_final:        activeTotal,
                 order_type:         orderType,
                 table_id:           activeTable?.id || null,
@@ -441,7 +453,7 @@
     function clearCartAfterPayment() {
         if (window.splitBillActive) {
             cart = cart.map(item => {
-                const splitState = selectedSplitItems[item.id];
+                const splitState = window.selectedSplitItems[item.id];
                 if (splitState && splitState.selected) {
                     item.qty -= splitState.qty;
                     item.total_price = item.qty * item.unit_price;
@@ -476,12 +488,45 @@
 
     const btnCetakStrukSuccess = document.getElementById('btnCetakStrukSuccess');
     if (btnCetakStrukSuccess) {
-        btnCetakStrukSuccess.addEventListener('click', () => {
-            if (window.lastOrderId) {
-                // Open PDF in a new tab
-                window.open('/pos/order/' + window.lastOrderId + '/print', '_blank');
-            } else {
+        btnCetakStrukSuccess.addEventListener('click', async () => {
+            if (!window.lastOrderId) {
                 showToast('ID Order tidak ditemukan, gagal mencetak.', true);
+                return;
+            }
+
+            // Cek apakah Web Bluetooth tersedia (Chrome + HTTPS/localhost)
+            const bluetoothAvailable = typeof navigator.bluetooth !== 'undefined';
+
+            if (!bluetoothAvailable) {
+                // Fallback: buka PDF di tab baru
+                window.open('/pos/order/' + window.lastOrderId + '/print', '_blank');
+                return;
+            }
+
+            // Bluetooth tersedia → fetch data order lalu cetak
+            btnCetakStrukSuccess.disabled = true;
+            btnCetakStrukSuccess.innerText = 'Menghubungkan...';
+
+            try {
+                const res = await fetch('/pos/order/' + window.lastOrderId + '/struk-data');
+                if (!res.ok) throw new Error('Gagal ambil data struk.');
+                const d = await res.json();
+
+                btnCetakStrukSuccess.innerText = 'Mencetak...';
+                await window.printBluetoothReceipt(d);
+                showToast('Struk berhasil dicetak!');
+            } catch (err) {
+                console.error(err);
+                // Jika user batalkan pairing atau error lain → fallback PDF
+                if (err.message && err.message.includes('dibatalkan')) {
+                    showToast('Pencarian printer dibatalkan.', true);
+                } else {
+                    showToast('Gagal cetak Bluetooth. Membuka PDF...', true);
+                    window.open('/pos/order/' + window.lastOrderId + '/print', '_blank');
+                }
+            } finally {
+                btnCetakStrukSuccess.disabled = false;
+                btnCetakStrukSuccess.innerText = 'Cetak Struk';
             }
         });
     }

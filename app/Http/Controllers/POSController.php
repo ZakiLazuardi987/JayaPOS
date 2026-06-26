@@ -1207,6 +1207,66 @@ class POSController extends Controller
     }
 
     // ==========================================
+    // ==========================================
+    // DATA STRUK (JSON untuk Bluetooth Printer)
+    // ==========================================
+    public function getStrukData($orderId)
+    {
+        $order = Order::with(['items.product'])->find($orderId);
+        if (!$order) return response()->json(['error' => 'Order tidak ditemukan'], 404);
+
+        $outlet        = DB::table('outlet')->where('outlet_id', $order->outlet_id)->first();
+        $staff         = DB::table('staff')->where('staff_id', $order->staff_id)->first();
+        $member        = $order->member_id ? DB::table('member')->where('member_id', $order->member_id)->first() : null;
+        $tax           = $order->tax_id ? DB::table('tax')->where('tax_id', $order->tax_id)->first() : null;
+        $service_charge = $order->service_charge_id ? DB::table('service_charge')->where('service_charge_id', $order->service_charge_id)->first() : null;
+        $payment       = DB::table('payment')->where('order_id', $order->order_id)->orderBy('payment_id', 'desc')->first();
+
+        $subtotal = (float) $order->subtotal;
+        $taxAmt   = $tax ? round($subtotal * ($tax->value / 100)) : 0;
+        $scAmt    = $service_charge ? round($subtotal * ($service_charge->value / 100)) : 0;
+        $discAmt  = (float) ($order->discount_amount ?? 0);
+
+        $items = $order->items->map(function ($item) {
+            $mods = DB::table('order_item_modifier')
+                ->join('modifier', 'modifier.modifier_id', '=', 'order_item_modifier.modifier_id')
+                ->where('order_item_modifier.order_item_id', $item->order_item_id)
+                ->select('modifier.name', 'order_item_modifier.price_added as price')
+                ->get();
+
+            return [
+                'name'       => $item->product?->name ?? 'Custom',
+                'qty'        => (int) $item->quantity,
+                'unit_price' => (float) $item->price_at_purchase,
+                'modifiers'  => $mods->map(fn($m) => ['name' => $m->name, 'price' => (float)$m->price])->toArray(),
+            ];
+        });
+
+        return response()->json([
+            'outletName'     => $outlet->name ?? 'Toko Kopi Jaya',
+            'outletAddress'  => $outlet->address ?? '',
+            'outletPhone'    => $outlet->phone ?? '',
+            'kasir'          => $staff->name ?? '-',
+            'orderId'        => $order->order_id,
+            'pickupCode'     => $order->pickup_code ?? null,
+            'tanggal'        => \Carbon\Carbon::parse($order->created_at)->timezone('Asia/Jakarta')->format('d-m-Y H:i'),
+            'orderType'      => $order->order_type ?? '-',
+            'member'         => $member ? $member->name : null,
+            'items'          => $items,
+            'subtotal'       => $subtotal,
+            'taxName'        => $tax ? ($tax->name . ' (' . ($tax->type == 'percentage' ? rtrim(rtrim($tax->value, '0'), '.') . '%' : 'Nominal') . ')') : null,
+            'taxAmount'      => $taxAmt,
+            'scName'         => $service_charge ? ($service_charge->name . ' (' . ($service_charge->type == 'percentage' ? rtrim(rtrim($service_charge->value, '0'), '.') . '%' : 'Nominal') . ')') : null,
+            'scAmount'       => $scAmt,
+            'discountAmount' => $discAmt,
+            'total'          => (float) $order->total_final,
+            'metode'         => $payment ? $payment->payment_method : 'QRIS',
+            'nominal'        => $payment ? (float)$payment->amount_paid : (float)$order->total_final,
+            'kembali'        => $payment ? (float)$payment->change_amount : 0,
+        ]);
+    }
+
+    // ==========================================
     // CETAK STRUK (PDF & Backup Thermal ESC/POS)
     // ==========================================
     public function cetakStruk($orderId)
