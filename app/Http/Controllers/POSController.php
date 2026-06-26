@@ -1251,6 +1251,7 @@ class POSController extends Controller
             'pickupCode'     => $order->pickup_code ?? null,
             'tanggal'        => \Carbon\Carbon::parse($order->created_at)->timezone('Asia/Jakarta')->format('d-m-Y H:i'),
             'orderType'      => $order->order_type ?? '-',
+            'status'         => $order->status ?? 'pending',
             'member'         => $member ? $member->name : null,
             'items'          => $items,
             'subtotal'       => $subtotal,

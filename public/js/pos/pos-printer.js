@@ -253,22 +253,28 @@ window.printBluetoothReceipt = async function (data) {
     buf.push(...enc.encode(padRow("Total", "Rp " + fmt(data.total), W) + "\n"));
     buf.push(ESC, 0x45, 0x00);
     
-    // Informasi Pembayaran (Hanya untuk Cash)
-    if (data.metode && (data.metode.toLowerCase() === 'cash' || data.metode.toLowerCase() === 'tunai')) {
-        buf.push(...enc.encode(padRow("Tunai", "Rp " + fmt(data.nominal), W) + "\n"));
-        buf.push(...enc.encode(padRow("Kembalian", "Rp " + fmt(data.kembali), W) + "\n"));
-    } else {
-        buf.push(...enc.encode(padRow("Metode Bayar", (data.metode || "").toUpperCase(), W) + "\n"));
+    // Informasi Pembayaran (Hanya jika LUNAS)
+    if (data.status === 'paid') {
+        if (data.metode && (data.metode.toLowerCase() === 'cash' || data.metode.toLowerCase() === 'tunai')) {
+            buf.push(...enc.encode(padRow("Tunai", "Rp " + fmt(data.nominal), W) + "\n"));
+            buf.push(...enc.encode(padRow("Kembalian", "Rp " + fmt(data.kembali), W) + "\n"));
+        } else {
+            buf.push(...enc.encode(padRow("Metode Bayar", (data.metode || "").toUpperCase(), W) + "\n"));
+        }
     }
 
     // Footer
     buf.push(...enc.encode("-".repeat(W) + "\n"));
     buf.push(ESC, 0x61, 0x01); // center
     
-    buf.push(...enc.encode("Pembayaran: " + (data.orderType || "CASH").toUpperCase() + "\n"));
+    buf.push(...enc.encode("Pesanan: " + (data.orderType || "DINE-IN").toUpperCase() + "\n"));
     
     buf.push(ESC, 0x45, 0x01); // bold
-    buf.push(...enc.encode("LUNAS\n\n"));
+    if (data.status === 'paid') {
+        buf.push(...enc.encode("LUNAS\n\n"));
+    } else {
+        buf.push(...enc.encode("BELUM BAYAR (SEMENTARA)\n\n"));
+    }
     buf.push(ESC, 0x45, 0x00); // normal
 
     buf.push(...enc.encode("Terima Kasih\n"));
