@@ -603,7 +603,37 @@
         btnCetakBillLuar.addEventListener('click', () => {
             const activeOrderId = localStorage.getItem('active_order_id');
             if (activeOrderId) {
-                window.open('/pos/order/' + activeOrderId + '/print', '_blank');
+                const bluetoothAvailable = navigator.bluetooth && window.isSecureContext;
+                if (!bluetoothAvailable) {
+                    window.open('/pos/order/' + activeOrderId + '/print', '_blank');
+                    return;
+                }
+
+                // Ambil data struk JSON
+                fetch('/pos/order/' + activeOrderId + '/struk-data')
+                    .then(res => {
+                        if (!res.ok) throw new Error("Gagal mengambil data struk.");
+                        return res.json();
+                    })
+                    .then(data => {
+                        if (typeof window.printBluetoothReceipt === 'function') {
+                            window.printBluetoothReceipt(data).catch(err => {
+                                console.error("Printer error:", err);
+                                if (err.name !== 'NotFoundError') {
+                                    showToast('Gagal cetak Bluetooth. Membuka PDF...', true);
+                                    window.open('/pos/order/' + activeOrderId + '/print', '_blank');
+                                } else {
+                                    showToast('Pencarian printer dibatalkan.', true);
+                                }
+                            });
+                        } else {
+                            window.open('/pos/order/' + activeOrderId + '/print', '_blank');
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        window.open('/pos/order/' + activeOrderId + '/print', '_blank');
+                    });
             } else {
                 showToast('Harap simpan bill terlebih dahulu sebelum mencetak.', true);
             }
