@@ -51,6 +51,9 @@ Route::middleware(['auth'])->group(function () {
         // Tampilan Custom (Kalkulator)
         Route::get('/custom', [POSController::class, 'custom'])->name('custom');
 
+        // Tampilan Denah Meja
+        Route::get('/denah-meja', [POSController::class, 'denahMeja'])->name('denah-meja');
+
         // AJAX: Detail produk (modifier tergroup)
         Route::get('/product-detail/{id}', [POSController::class, 'getProductDetail'])->name('productDetail');
 

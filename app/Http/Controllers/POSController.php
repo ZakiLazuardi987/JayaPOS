@@ -122,6 +122,44 @@ class POSController extends Controller
     // ==========================================
     // 3. HALAMAN CUSTOM (Kalkulator)
     // ==========================================
+
+    // ==========================================
+    // 4. HALAMAN DENAH MEJA
+    // ==========================================
+    public function denahMeja()
+    {
+        if (!session('active_outlet')) {
+            return redirect('/login')->withErrors(['msg' => 'Silakan pilih outlet terlebih dahulu.']);
+        }
+
+        $discounts = DB::table('discount')->where('is_active', 1)->get();
+        $serviceCharges = DB::table('service_charge')->where('is_active', 1)->get();
+        $taxes = DB::table('tax')->where('is_active', 1)->get();
+        $staffs = DB::table('staff')->where('is_active', 1)->where('outlet_id', session('active_outlet'))->get();
+
+        // Ambil data meja dan area aktif dengan pesanan pending
+        $areas = \App\Models\Area::with(['tables' => function($query) {
+            $query->orderBy('name', 'asc');
+        }])->where('outlet_id', session('active_outlet'))->get();
+
+        // Siapkan data detail pesanan pending per meja untuk ditampilkan di popup
+        $tableOrders = [];
+        foreach ($areas as $area) {
+            foreach ($area->tables as $table) {
+                if ($table->status === 'occupied') {
+                    // Cari order pending untuk meja ini
+                    $order = \App\Models\Order::with('items.product')->where('table_id', $table->table_id)->where('status', 'pending')->first();
+                    if ($order) {
+                        $tableOrders[$table->table_id] = $order;
+                    }
+                }
+            }
+        }
+
+        $isFloorPlan = true;
+
+        return view('pos.denah-meja', compact('discounts', 'serviceCharges', 'taxes', 'staffs', 'areas', 'tableOrders', 'isFloorPlan'));
+    }
     public function custom()
     {
         if (!session('active_outlet')) {
@@ -316,8 +354,11 @@ class POSController extends Controller
             'items.product',
         ])
             ->where('outlet_id', $outletId)
-            ->where('status', 'pending')
-            ->findOrFail($orderId);
+            ->find($orderId);
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Pesanan tidak ditemukan.'], 404);
+        }
 
         // Bangun cart items dari order_items (kompatibel dengan format cart JS)
         $cartItems = $order->items->map(function ($item) {
@@ -440,7 +481,11 @@ class POSController extends Controller
             DB::transaction(function () use ($request, $orderId, $outletId) {
                 $order = Order::where('outlet_id', $outletId)
                     ->where('status', 'pending')
-                    ->findOrFail($orderId);
+                    ->find($orderId);
+
+                if (!$order) {
+                    return response()->json(['success' => false, 'message' => 'Pesanan tidak ditemukan.'], 404);
+                }
 
                 $oldTableId = $order->table_id;
                 $newTableId = $request->table_id;

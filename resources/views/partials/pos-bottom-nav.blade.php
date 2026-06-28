@@ -1,11 +1,14 @@
 <div class="bottom-nav">
-    <button class="nav-btn btn-hamburger" id="{{ isset($isFloorPlan) && $isFloorPlan ? 'btnFloorPlanMenu' : 'btnMenu' }}" style="{{ isset($isFloorPlan) && $isFloorPlan ? 'pointer-events: none; cursor: default;' : '' }}">
+    <button class="nav-btn btn-hamburger" id="btnMenu">
         <img src="{{ asset('assets/hamburger_icon.png') }}" alt="Menu" style="width: 32px; height: 32px; object-fit: contain;">
     </button>
 
     @if(isset($isFloorPlan) && $isFloorPlan)
         {{-- Floor Plan Area Tabs --}}
-        <div style="display:flex; flex:1; overflow-x:auto; align-items:stretch;">
+        <style>
+            .bottom-nav-tabs::-webkit-scrollbar { display: none; }
+        </style>
+        <div class="bottom-nav-tabs" style="display:flex; flex:1; overflow-x:auto; align-items:stretch; scrollbar-width: none; -ms-overflow-style: none;">
             @if(isset($areas) && count($areas) > 0)
                 @foreach($areas as $areaIdx => $area)
                     @php

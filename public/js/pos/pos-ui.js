@@ -3,14 +3,16 @@
 // =========================================================
 // SIDEBAR
 // =========================================================
-    const btnMenu  = document.getElementById('btnMenu');
+    const btnMenus = document.querySelectorAll('.btn-hamburger');
     const sidebar  = document.getElementById('sidebar');
     const sideOverlay = document.getElementById('sidebarOverlay');
 
-    if (btnMenu) {
-        btnMenu.addEventListener('click', () => {
-            sidebar.classList.add('open');
-            sideOverlay.style.display = 'block';
+    if (btnMenus.length > 0) {
+        btnMenus.forEach(btn => {
+            btn.addEventListener('click', () => {
+                sidebar.classList.add('open');
+                sideOverlay.style.display = 'block';
+            });
         });
     }
     if (sideOverlay) {

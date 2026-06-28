@@ -1629,3 +1629,10 @@ body {
     font-weight: 500;
 }
 
+
+/* Fix for SweetAlert2 height bug */
+body.swal2-height-auto, html.swal2-height-auto { height: 100vh !important; }
+
+
+body.swal2-shown { padding-right: 0 !important; }
+

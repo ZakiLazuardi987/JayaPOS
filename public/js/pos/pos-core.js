@@ -38,3 +38,6 @@
             setTimeout(() => mainToast.remove(), 500);
         }, 4000);
     }
+
+Swal = Swal.mixin({ heightAuto: false });
+
