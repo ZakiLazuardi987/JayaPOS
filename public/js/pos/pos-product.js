@@ -258,6 +258,15 @@
 
             const qty = parseInt(inputQty.value) || 1;
 
+            if (currentProduct.stock !== undefined && qty > currentProduct.stock) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Stok Tidak Mencukupi',
+                    text: `Sisa stok ${currentProduct.name} hanya ${currentProduct.stock}.`
+                });
+                return;
+            }
+
             // Kumpulkan modifier yang dipilih
             const selectedMods = [];
             let extraPrice = 0;

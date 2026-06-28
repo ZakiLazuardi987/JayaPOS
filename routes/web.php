@@ -58,6 +58,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/aktivitas', [POSController::class, 'aktivitas'])->name('aktivitas');
         Route::post('/orders/{id}/refund', [POSController::class, 'refundOrder'])->name('refundOrder');
 
+        // Tampilan Inventori (Stok)
+        Route::get('/inventori', [POSController::class, 'inventori'])->name('inventori');
+        Route::post('/inventori/update', [POSController::class, 'updateInventori'])->name('updateInventori');
+
         // AJAX: Detail produk (modifier tergroup)
         Route::get('/product-detail/{id}', [POSController::class, 'getProductDetail'])->name('productDetail');
 

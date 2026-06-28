@@ -21,7 +21,7 @@
                 @endforeach
             @endif
         </div>
-    @else
+    @elseif(request()->routeIs('pos.favorit', 'pos.library', 'pos.custom'))
         {{-- Standard POS Tabs --}}
         <a href="{{ route('pos.favorit') }}" class="nav-btn {{ request()->routeIs('pos.favorit') ? 'active' : '' }}">
             <img src="{{ asset('assets/favorite_icon.png') }}" alt="Favorit" style="width: 24px; height: 24px; object-fit: contain;">

@@ -195,6 +195,14 @@ class POSController extends Controller
                 return response()->json(['success' => false, 'message' => 'Pesanan sudah di-refund sebelumnya.']);
             }
 
+            // Restore stock
+            $items = \App\Models\OrderItem::where('order_id', $order->order_id)->get();
+            foreach ($items as $item) {
+                if ($item->product_id != 999) {
+                    \App\Models\Product::where('product_id', $item->product_id)->increment('stock', $item->quantity);
+                }
+            }
+
             $order->status = 'cancelled';
             $order->save();
 
@@ -209,6 +217,43 @@ class POSController extends Controller
         } catch (\Exception $e) {
             \DB::rollBack();
             return response()->json(['success' => false, 'message' => 'Gagal memproses refund: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function inventori()
+    {
+        if (!session('active_outlet')) {
+            return redirect('/pos/outlet');
+        }
+
+        $search = request('search');
+
+        $productsQuery = \App\Models\Product::where('is_available', 1);
+
+        if ($search) {
+            $productsQuery->where('name', 'like', '%' . $search . '%');
+        }
+
+        $products = $productsQuery->orderBy('name')->get();
+
+        return view('pos.inventori', compact('products', 'search'));
+    }
+
+    public function updateInventori(Request $request)
+    {
+        try {
+            $request->validate([
+                'product_id' => 'required|integer',
+                'stock' => 'required|integer|min:0'
+            ]);
+
+            $product = \App\Models\Product::findOrFail($request->product_id);
+            $product->stock = $request->stock;
+            $product->save();
+
+            return response()->json(['success' => true, 'message' => 'Stok berhasil diupdate', 'new_stock' => $product->stock]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Gagal mengupdate stok: ' . $e->getMessage()], 500);
         }
     }
 
@@ -318,8 +363,12 @@ class POSController extends Controller
                 // Buat Order Items dan Modifiers
                 foreach ($request->cart as $item) {
                     $productId = $item['product_id'];
-                    $isCustom = str_starts_with($productId, 'custom_');
+                    $isCustom = str_starts_with((string)$productId, 'custom_');
                     $dbProductId = $isCustom ? 999 : (int)$productId;
+
+                    if (!$isCustom) {
+                        \App\Models\Product::where('product_id', $dbProductId)->decrement('stock', (int)$item['qty']);
+                    }
 
                     $orderItem = \App\Models\OrderItem::create([
                         'order_id' => $order->order_id,
@@ -635,6 +684,12 @@ class POSController extends Controller
                         'points_earned'     => $pointsEarned,
                     ]);
                     $oldItemIds = \App\Models\OrderItem::where('order_id', $order->order_id)->pluck('order_item_id');
+                    $oldItems = \App\Models\OrderItem::where('order_id', $order->order_id)->get();
+                    foreach($oldItems as $oldItem) {
+                        if($oldItem->product_id != 999) {
+                            \App\Models\Product::where('product_id', $oldItem->product_id)->increment('stock', $oldItem->quantity);
+                        }
+                    }
                     \Illuminate\Support\Facades\DB::table('order_item_modifier')->whereIn('order_item_id', $oldItemIds)->delete();
                     \App\Models\OrderItem::where('order_id', $order->order_id)->delete();
                 } else {
@@ -672,6 +727,10 @@ class POSController extends Controller
                     $productId   = $item['product_id'];
                     $isCustom    = str_starts_with((string)$productId, 'custom_');
                     $dbProductId = $isCustom ? 999 : (int)$productId;
+
+                    if (!$isCustom) {
+                        \App\Models\Product::where('product_id', $dbProductId)->decrement('stock', (int)$item['qty']);
+                    }
 
                     $orderItem = OrderItem::create([
                         'order_id'          => $order->order_id,
@@ -804,6 +863,12 @@ class POSController extends Controller
                         'points_earned'     => $pointsEarned,
                     ]);
                     $oldItemIds = \App\Models\OrderItem::where('order_id', $order->order_id)->pluck('order_item_id');
+                    $oldItems = \App\Models\OrderItem::where('order_id', $order->order_id)->get();
+                    foreach($oldItems as $oldItem) {
+                        if($oldItem->product_id != 999) {
+                            \App\Models\Product::where('product_id', $oldItem->product_id)->increment('stock', $oldItem->quantity);
+                        }
+                    }
                     \Illuminate\Support\Facades\DB::table('order_item_modifier')->whereIn('order_item_id', $oldItemIds)->delete();
                     \App\Models\OrderItem::where('order_id', $order->order_id)->delete();
                 } else {
@@ -836,6 +901,10 @@ class POSController extends Controller
                     $productId   = $item['product_id'];
                     $isCustom    = str_starts_with((string)$productId, 'custom_');
                     $dbProductId = $isCustom ? 999 : (int)$productId;
+
+                    if (!$isCustom) {
+                        \App\Models\Product::where('product_id', $dbProductId)->decrement('stock', (int)$item['qty']);
+                    }
 
                     $orderItem = OrderItem::create([
                         'order_id'          => $order->order_id,
@@ -1157,6 +1226,12 @@ class POSController extends Controller
                         'points_earned'     => $pointsEarned,
                     ]);
                     $oldItemIds = \App\Models\OrderItem::where('order_id', $order->order_id)->pluck('order_item_id');
+                    $oldItems = \App\Models\OrderItem::where('order_id', $order->order_id)->get();
+                    foreach($oldItems as $oldItem) {
+                        if($oldItem->product_id != 999) {
+                            \App\Models\Product::where('product_id', $oldItem->product_id)->increment('stock', $oldItem->quantity);
+                        }
+                    }
                     \Illuminate\Support\Facades\DB::table('order_item_modifier')->whereIn('order_item_id', $oldItemIds)->delete();
                     \App\Models\OrderItem::where('order_id', $order->order_id)->delete();
                 } else {
@@ -1193,6 +1268,10 @@ class POSController extends Controller
                     $productId   = $item['product_id'];
                     $isCustom    = str_starts_with((string)$productId, 'custom_');
                     $dbProductId = $isCustom ? 999 : (int)$productId;
+
+                    if (!$isCustom) {
+                        \App\Models\Product::where('product_id', $dbProductId)->decrement('stock', (int)$item['qty']);
+                    }
 
                     $orderItem = OrderItem::create([
                         'order_id'          => $order->order_id,
@@ -1285,6 +1364,14 @@ class POSController extends Controller
 
         try {
             DB::transaction(function () use ($order) {
+                // Restore stock
+                $items = \App\Models\OrderItem::where('order_id', $order->order_id)->get();
+                foreach ($items as $item) {
+                    if ($item->product_id != 999) {
+                        \App\Models\Product::where('product_id', $item->product_id)->increment('stock', $item->quantity);
+                    }
+                }
+
                 // Hapus payment records terkait
                 Payment::where('order_id', $order->order_id)->delete();
 
