@@ -22,6 +22,7 @@
             margin: 0;
             font-family: 'Inter', sans-serif;
             display: flex;
+            flex-direction: row; /* FIX: override flex-direction: column from pos-global.css */
             height: 100vh;
             overflow: hidden;
             background: var(--bg-content);
