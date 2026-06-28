@@ -54,8 +54,9 @@
         });
     }
 
-    if (btnBatalLoyalty && modalLoyalty) {
-        btnBatalLoyalty.addEventListener('click', () => {
+    const btnBatalLoyaltyEl = document.getElementById('btnBatalLoyalty');
+    if (btnBatalLoyaltyEl && modalLoyalty) {
+        btnBatalLoyaltyEl.addEventListener('click', () => {
             modalLoyalty.style.display = 'none';
             window.splitBillActive = false;
             window.splitBillSummaryData = null;

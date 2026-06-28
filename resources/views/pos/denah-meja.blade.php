@@ -287,10 +287,13 @@ document.getElementById('modalTableEmpty').addEventListener('click', function(e)
 // LIHAT PESANAN — redirect ke POS dengan bill di-load
 // ======================================================
 document.getElementById('btnLihatPesanan').addEventListener('click', function () {
-    if (!activeOrderId) return;
+    if (!activeOrderId || activeOrderId === 'null' || activeOrderId === 'undefined') return;
+    
+    // Simpan ke variabel lokal sebelum activeOrderId direset jadi null oleh closeTableDetail()
+    const fetchOrderId = activeOrderId;
     closeTableDetail();
 
-    fetch('/pos/orders/' + activeOrderId + '/detail', {
+    fetch('/pos/orders/' + fetchOrderId + '/detail', {
         headers: {
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
             'Accept': 'application/json'
@@ -299,10 +302,27 @@ document.getElementById('btnLihatPesanan').addEventListener('click', function ()
     .then(r => r.json())
     .then(res => {
         if (res.success && res.order) {
-            // Simpan ke localStorage; POS page akan auto-load saat terbuka
-            localStorage.setItem('pos_pending_order_id', res.order.order_id);
-            localStorage.setItem('pos_pending_cart',     JSON.stringify(res.cart));
-            localStorage.setItem('pos_pending_order',    JSON.stringify(res.order));
+            // Gunakan key localStorage standar POS agar otomatis di-load di halaman POS
+            localStorage.setItem('active_order_id', res.order.order_id);
+            
+            const cartItems = (res.cart || []).map((item, idx) => ({
+                ...item,
+                id: item.id || (Date.now() + idx),
+            }));
+            localStorage.setItem('pos_cart', JSON.stringify(cartItems));
+
+            if (res.order.table_id) {
+                localStorage.setItem('active_table', JSON.stringify({
+                    id:           res.order.table_id,
+                    name:         res.order.meja,
+                    pax:          res.order.pax,
+                    waiter_id:    res.order.waiter_id,
+                    waiter_name:  res.order.waiter_name,
+                }));
+            } else {
+                localStorage.removeItem('active_table');
+            }
+
             window.location.href = '/pos/library';
         } else {
             Swal.fire({ icon: 'error', title: 'Gagal', text: res.message || 'Pesanan tidak ditemukan.', confirmButtonColor: '#C43626' });

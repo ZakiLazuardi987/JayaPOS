@@ -532,7 +532,7 @@
             const row = e.target.closest('.daftar-bill-row');
             if (!row) return;
             const orderId = row.dataset.orderId;
-            if (!orderId) return;
+            if (!orderId || orderId === 'null' || orderId === 'undefined') return;
 
             showLoading();
             fetch(`/pos/orders/${orderId}/detail`, {

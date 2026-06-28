@@ -232,7 +232,7 @@ class POSController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($request, $outletId) {
+            $createdOrderId = DB::transaction(function () use ($request, $outletId) {
                 // Pastikan ada produk fallback untuk custom amount
                 DB::table('products')->updateOrInsert(
                     ['product_id' => 999],
@@ -293,9 +293,15 @@ class POSController extends Controller
                 DB::table('tables')
                     ->where('table_id', $request->table_id)
                     ->update(['status' => 'occupied']);
+                    
+                return $order->order_id;
             });
 
-            return response()->json(['success' => true, 'message' => 'Bill berhasil disimpan.']);
+            return response()->json([
+                'success' => true, 
+                'message' => 'Bill berhasil disimpan.',
+                'order_id' => $createdOrderId
+            ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Gagal menyimpan bill: ' . $e->getMessage()], 500);
         }
