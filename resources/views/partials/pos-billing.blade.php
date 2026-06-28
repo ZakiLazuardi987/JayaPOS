@@ -106,7 +106,7 @@
                 <button class="option-btn" data-type="gofood" id="optTypeGoFood">GoFood</button>
                 <button class="option-btn" data-type="grabfood" id="optTypeGrabFood">GrabFood</button>
                 <button class="option-btn" data-type="shopeefood" id="optTypeShopeeFood">ShopeeFood</button>
-                <button class="option-btn option-disabled" disabled>Maxim Food</button>
+                <!-- <button class="option-btn option-disabled" disabled>Maxim Food</button> -->
             </div>
         </div>
     </div>

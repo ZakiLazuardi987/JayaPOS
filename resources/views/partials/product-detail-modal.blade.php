@@ -83,10 +83,10 @@
                         <input type="radio" name="modal_order_type" value="shopeefood" hidden>
                         ShopeeFood
                     </label>
-                    <label class="option-btn option-disabled" id="optMaximfood">
+                    <!-- <label class="option-btn option-disabled" id="optMaximfood">
                         <input type="radio" name="modal_order_type" value="maximfood" hidden disabled>
                         Maxim Food
-                    </label>
+                    </label> -->
                 </div>
                 
                 <div class="order-type-hint-text">
