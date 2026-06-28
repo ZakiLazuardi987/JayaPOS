@@ -255,8 +255,8 @@ window.printBluetoothReceipt = async function (data) {
     buf.push(...enc.encode(padRow("Total", "Rp " + fmt(data.total), W) + "\n"));
     buf.push(ESC, 0x45, 0x00);
     
-    // Informasi Pembayaran (Hanya jika LUNAS)
-    if (data.status === 'paid') {
+    // Informasi Pembayaran (Hanya jika LUNAS atau dibatalkan)
+    if (data.status === 'paid' || data.status === 'completed' || data.status === 'cancelled' || data.status === 'refunded') {
         if (data.metode && (data.metode.toLowerCase() === 'cash' || data.metode.toLowerCase() === 'tunai')) {
             buf.push(...enc.encode(padRow("Tunai", "Rp " + fmt(data.nominal), W) + "\n"));
             buf.push(...enc.encode(padRow("Kembalian", "Rp " + fmt(data.kembali), W) + "\n"));
@@ -272,8 +272,10 @@ window.printBluetoothReceipt = async function (data) {
     buf.push(...enc.encode("Pesanan: " + (data.orderType || "DINE-IN").toUpperCase() + "\n"));
     
     buf.push(ESC, 0x45, 0x01); // bold
-    if (data.status === 'paid') {
+    if (data.status === 'paid' || data.status === 'completed') {
         buf.push(...enc.encode("LUNAS\n\n"));
+    } else if (data.status === 'cancelled' || data.status === 'refunded') {
+        buf.push(...enc.encode("DIBATALKAN / REFUND\n\n"));
     } else {
         buf.push(...enc.encode("BELUM BAYAR (SEMENTARA)\n\n"));
     }

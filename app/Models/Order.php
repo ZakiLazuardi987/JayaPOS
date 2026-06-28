@@ -52,4 +52,19 @@ class Order extends Model
     {
         return $this->belongsTo(Staff::class, 'waiter_id', 'staff_id');
     }
+
+    public function payment()
+    {
+        return $this->hasOne(Payment::class, 'order_id', 'order_id');
+    }
+
+    public function tax()
+    {
+        return $this->belongsTo(Tax::class, 'tax_id', 'tax_id');
+    }
+
+    public function serviceCharge()
+    {
+        return $this->belongsTo(ServiceCharge::class, 'service_charge_id', 'service_charge_id');
+    }
 }

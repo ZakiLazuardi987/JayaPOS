@@ -160,6 +160,58 @@ class POSController extends Controller
 
         return view('pos.denah-meja', compact('discounts', 'serviceCharges', 'taxes', 'staffs', 'areas', 'tableOrders', 'isFloorPlan'));
     }
+
+    public function aktivitas()
+    {
+        if (!session('active_outlet')) {
+            return redirect('/login')->withErrors(['msg' => 'Silakan pilih outlet terlebih dahulu.']);
+        }
+
+        $date = request('date', date('Y-m-d'));
+        
+        $orders = \App\Models\Order::with(['payment', 'items.product', 'waiter', 'tax', 'serviceCharge', 'items.modifiers.modifier'])
+            ->where('outlet_id', session('active_outlet'))
+            ->whereIn('status', ['paid', 'completed', 'cancelled', 'refunded'])
+            ->whereDate('created_at', $date)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $totalSales = $orders->whereIn('status', ['paid', 'completed'])->sum('total_final');
+        $totalTransactions = $orders->whereIn('status', ['paid', 'completed'])->count();
+
+        $outlet = \App\Models\Outlet::find(session('active_outlet'));
+
+        return view('pos.aktivitas', compact('orders', 'date', 'totalSales', 'totalTransactions', 'outlet'));
+    }
+
+    public function refundOrder($id)
+    {
+        try {
+            \DB::beginTransaction();
+
+            $order = \App\Models\Order::with('payment')->findOrFail($id);
+            
+            if ($order->status === 'cancelled') {
+                return response()->json(['success' => false, 'message' => 'Pesanan sudah di-refund sebelumnya.']);
+            }
+
+            $order->status = 'cancelled';
+            $order->save();
+
+            if ($order->payment) {
+                $order->payment->status = 'refunded';
+                $order->payment->save();
+            }
+
+            \DB::commit();
+            return response()->json(['success' => true, 'message' => 'Refund berhasil diproses.']);
+
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'Gagal memproses refund: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function custom()
     {
         if (!session('active_outlet')) {

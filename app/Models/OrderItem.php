@@ -29,4 +29,10 @@ class OrderItem extends Model
     {
         return $this->belongsTo(Product::class, 'product_id', 'product_id');
     }
+
+    public function modifiers()
+    {
+        return $this->belongsToMany(Modifier::class, 'order_item_modifier', 'order_item_id', 'modifier_id')
+                    ->withPivot('price_added');
+    }
 }

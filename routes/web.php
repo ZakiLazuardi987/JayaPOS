@@ -54,6 +54,10 @@ Route::middleware(['auth'])->group(function () {
         // Tampilan Denah Meja
         Route::get('/denah-meja', [POSController::class, 'denahMeja'])->name('denah-meja');
 
+        // Tampilan Aktivitas (Histori Transaksi)
+        Route::get('/aktivitas', [POSController::class, 'aktivitas'])->name('aktivitas');
+        Route::post('/orders/{id}/refund', [POSController::class, 'refundOrder'])->name('refundOrder');
+
         // AJAX: Detail produk (modifier tergroup)
         Route::get('/product-detail/{id}', [POSController::class, 'getProductDetail'])->name('productDetail');
 
