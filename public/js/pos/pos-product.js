@@ -258,11 +258,20 @@
 
             const qty = parseInt(inputQty.value) || 1;
 
-            if (currentProduct.stock !== undefined && qty > currentProduct.stock) {
+            let existingQty = 0;
+            // Jika mode edit, kita hitung qty di luar item yang sedang di-edit
+            cart.forEach(item => {
+                if (item.product_id === currentProduct.product_id && item.id !== editingCartId) {
+                    existingQty += parseInt(item.qty) || 0;
+                }
+            });
+
+            if (currentProduct.stock !== undefined && (qty + existingQty) > currentProduct.stock) {
+                const sisa = currentProduct.stock - existingQty;
                 Swal.fire({
                     icon: 'warning',
                     title: 'Stok Tidak Mencukupi',
-                    text: `Sisa stok ${currentProduct.name} hanya ${currentProduct.stock}.`
+                    text: `Stok ${currentProduct.name} sisa ${currentProduct.stock}. Di keranjang sudah ada ${existingQty}, maksimal penambahan: ${Math.max(0, sisa)}.`
                 });
                 return;
             }

@@ -86,6 +86,7 @@ class POSController extends Controller
             'price'      => (float) $product->base_price,
             'img_url'    => $product->img_url,
             'earning_points' => (int) $product->earning_points,
+            'stock'      => (int) $product->stock,
             'groups'     => $groups,
         ]);
     }
