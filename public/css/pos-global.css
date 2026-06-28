@@ -1636,3 +1636,8 @@ body.swal2-height-auto, html.swal2-height-auto { height: 100vh !important; }
 
 body.swal2-shown { padding-right: 0 !important; }
 
+
+/* Override SweetAlert2 z-index */
+.swal2-container {
+    z-index: 3000 !important;
+}
