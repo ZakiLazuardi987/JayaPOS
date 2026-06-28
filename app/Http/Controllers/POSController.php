@@ -169,7 +169,7 @@ class POSController extends Controller
 
         $date = request('date', date('Y-m-d'));
         
-        $orders = \App\Models\Order::with(['payment', 'items.product', 'waiter', 'tax', 'serviceCharge', 'items.modifiers.modifier'])
+        $orders = \App\Models\Order::with(['payment', 'items.product', 'waiter', 'tax', 'serviceCharge', 'items.modifiers'])
             ->where('outlet_id', session('active_outlet'))
             ->whereIn('status', ['paid', 'completed', 'cancelled', 'refunded'])
             ->whereDate('created_at', $date)
