@@ -239,6 +239,37 @@ class POSController extends Controller
 
         return view('pos.inventori', compact('products', 'search'));
     }
+    public function pengaturan()
+    {
+        if (!session('active_outlet')) {
+            return redirect('/pos/outlet');
+        }
+
+        $outlet = \App\Models\Outlet::find(session('active_outlet'));
+        // Mengambil staf yang sedang login jika menggunakan auth web
+        $staff = auth()->user();
+
+        return view('pos.pengaturan', compact('outlet', 'staff'));
+    }
+
+    public function updatePengaturanOutlet(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'address' => 'required|string',
+            'phone' => 'required|string|max:20',
+        ]);
+        
+        $outlet = \App\Models\Outlet::find(session('active_outlet'));
+        if ($outlet) {
+            $outlet->name = $request->name;
+            $outlet->address = $request->address;
+            $outlet->phone = $request->phone;
+            $outlet->save();
+        }
+        
+        return redirect()->back()->with('success', 'Pengaturan outlet berhasil disimpan!');
+    }
 
     public function updateInventori(Request $request)
     {
