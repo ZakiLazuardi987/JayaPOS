@@ -221,6 +221,14 @@ class POSController extends Controller
         }
     }
 
+    public function pesananOnline()
+    {
+        if (!session('active_outlet')) {
+            return redirect('/pos/outlet');
+        }
+        return view('pos.pesanan-online');
+    }
+
     public function inventori()
     {
         if (!session('active_outlet')) {
@@ -1551,4 +1559,4 @@ class POSController extends Controller
         
         return $pdf->stream('struk-' . $order->order_id . '.pdf');
     }
-}
+} 

@@ -24,6 +24,7 @@ body {
     font-family: "Inter", sans-serif;
     background-color: var(--bg);
     height: 100vh;
+    height: 100dvh; /* Dynamic viewport untuk mobile/tablet */
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -33,7 +34,6 @@ body {
 .pos-container {
     display: flex;
     flex: 1;
-    height: calc(100vh - 70px);
     overflow: hidden;
 }
 .left-panel {
